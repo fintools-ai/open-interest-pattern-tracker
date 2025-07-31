@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OI Pattern Clustering System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: #111111;
+            border-right: 1px solid #2a2a2a;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .logo {
+            padding: 20px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        
+        .logo h1 {
+            font-size: 24px;
+            background: linear-gradient(135deg, #00ff88, #00aaff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .watchlist {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .watchlist-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .watchlist-header h2 {
+            font-size: 14px;
+            color: #888;
+            text-transform: uppercase;
+        }
+        
+        .add-ticker {
+            background: #00ff88;
+            color: #000;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .ticker-item {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .ticker-item:hover {
+            border-color: #00ff88;
+            transform: translateX(5px);
+        }
+        
+        .ticker-item.active {
+            border-color: #00ff88;
+            background: #1f2f1f;
+        }
+        
+        .ticker-symbol {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .ticker-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+        
+        .stat-value {
+            color: #888;
+        }
+        
+        .stat-value.positive {
+            color: #00ff88;
+        }
+        
+        .stat-value.negative {
+            color: #ff4444;
+        }
+        
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        /* Header */
+        .header {
+            background: #111111;
+            border-bottom: 1px solid #2a2a2a;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+        
+        .current-ticker {
+            font-size: 28px;
+            font-weight: 700;
+        }
+        
+        .ticker-price {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+        }
+        
+        .price {
+            font-size: 24px;
+        }
+        
+        .price-change {
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(0, 255, 136, 0.1);
+            color: #00ff88;
+        }
+        
+        .price-change.negative {
+            background: rgba(255, 68, 68, 0.1);
+            color: #ff4444;
+        }
+        
+        .scan-controls {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .scan-btn {
+            background: #00aaff;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .scan-btn:hover {
+            background: #0088cc;
+        }
+        
+        /* Tab Navigation */
+        .tabs {
+            background: #0a0a0a;
+            border-bottom: 1px solid #2a2a2a;
+            display: flex;
+            padding: 0 30px;
+        }
+        
+        .tab {
+            padding: 15px 25px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        
+        .tab:hover {
+            color: #fff;
+        }
+        
+        .tab.active {
+            color: #00ff88;
+            border-bottom-color: #00ff88;
+        }
+        
+        /* Content Area */
+        .content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+        
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: #111111;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .card-badge {
+            background: rgba(0, 255, 136, 0.1);
+            color: #00ff88;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        
+        /* Open Interest Chart */
+        .oi-chart {
+            height: 300px;
+            background: #0a0a0a;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #444;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .oi-bars {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            height: 80%;
+            padding: 0 20px;
+        }
+        
+        .oi-bar {
+            width: 20px;
+            background: linear-gradient(to top, #00ff88, #00aa66);
+            margin: 0 2px;
+            border-radius: 4px 4px 0 0;
+            position: relative;
+            transition: all 0.3s;
+        }
+        
+        .oi-bar.put {
+            background: linear-gradient(to top, #ff4444, #cc3333);
+        }
+        
+        .oi-bar:hover {
+            transform: scale(1.1);
+        }
+        
+        /* Signal Table */
+        .signal-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .signal-table th {
+            text-align: left;
+            padding: 12px;
+            font-size: 12px;
+            color: #888;
+            font-weight: 500;
+            text-transform: uppercase;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        
+        .signal-table td {
+            padding: 16px 12px;
+            border-bottom: 1px solid #1a1a1a;
+        }
+        
+        .signal-table tr:hover {
+            background: #1a1a1a;
+        }
+        
+        .signal-strength {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .signal-strength.strong {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+        
+        .signal-strength.moderate {
+            background: rgba(255, 170, 0, 0.2);
+            color: #ffaa00;
+        }
+        
+        .probability-meter {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .probability-bar {
+            flex: 1;
+            height: 8px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .probability-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4444, #ffaa00, #00ff88);
+            transition: width 0.3s;
+        }
+        
+        /* Trade Setup Card */
+        .trade-setup {
+            background: linear-gradient(135deg, #1a2f1a, #1a1a2f);
+            border: 1px solid #00ff88;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .setup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .setup-type {
+            font-size: 18px;
+            font-weight: 700;
+            color: #00ff88;
+        }
+        
+        .setup-confidence {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .setup-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        .setup-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .setup-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        
+        .setup-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        /* Scanning Animation */
+        @keyframes scan {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+        
+        .scanning-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #00ff88, transparent);
+            animation: scan 2s linear infinite;
+        }
+        
+        /* Alerts */
+        .alert-popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #1a2f1a;
+            border: 1px solid #00ff88;
+            border-radius: 8px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .alert-icon {
+            width: 24px;
+            height: 24px;
+            background: #00ff88;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">
+                <h1>OI Tracker Pro</h1>
+            </div>
+            <div class="watchlist">
+                <div class="watchlist-header">
+                    <h2>Watchlist</h2>
+                    <button class="add-ticker">+ Add</button>
+                </div>
+                <div class="ticker-item active">
+                    <div class="ticker-symbol">SPY</div>
+                    <div class="ticker-stats">
+                        <span>OI Trend: <span class="stat-value positive">+12.4%</span></span>
+                        <span>Signal: <span class="stat-value positive">CALL</span></span>
+                    </div>
+                </div>
+                <div class="ticker-item">
+                    <div class="ticker-symbol">QQQ</div>
+                    <div class="ticker-stats">
+                        <span>OI Trend: <span class="stat-value negative">-8.2%</span></span>
+                        <span>Signal: <span class="stat-value negative">PUT</span></span>
+                    </div>
+                </div>
+                <div class="ticker-item">
+                    <div class="ticker-symbol">NVDA</div>
+                    <div class="ticker-stats">
+                        <span>OI Trend: <span class="stat-value positive">+24.7%</span></span>
+                        <span>Signal: <span class="stat-value positive">CALL</span></span>
+                    </div>
+                </div>
+                <div class="ticker-item">
+                    <div class="ticker-symbol">AAPL</div>
+                    <div class="ticker-stats">
+                        <span>OI Trend: <span class="stat-value">+2.1%</span></span>
+                        <span>Signal: <span class="stat-value">NEUTRAL</span></span>
+                    </div>
+                </div>
+                <div class="ticker-item">
+                    <div class="ticker-symbol">TSLA</div>
+                    <div class="ticker-stats">
+                        <span>OI Trend: <span class="stat-value positive">+18.3%</span></span>
+                        <span>Signal: <span class="stat-value positive">CALL</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-left">
+                    <div class="current-ticker">SPY</div>
+                    <div class="ticker-price">
+                        <div class="price">$447.25</div>
+                        <div class="price-change">+1.24 (0.28%)</div>
+                    </div>
+                </div>
+                <div class="scan-controls">
+                    <button class="scan-btn">
+                        <span>🔍</span>
+                        Full Market Scan
+                    </button>
+                    <button class="scan-btn">
+                        <span>⚡</span>
+                        Real-Time Mode
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab active">Open Interest Analysis</div>
+                <div class="tab">Trade Signals</div>
+                <div class="tab">Support/Resistance</div>
+                <div class="tab">Order Flow</div>
+                <div class="tab">Risk Monitor</div>
+            </div>
+            
+            <!-- Content -->
+            <div class="content">
+                <!-- Dashboard Grid -->
+                <div class="dashboard-grid">
+                    <!-- OI Distribution -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Open Interest Distribution</h3>
+                            <span class="card-badge">Live</span>
+                        </div>
+                        <div class="oi-chart">
+                            <div class="oi-bars">
+                                <div class="oi-bar put" style="height: 30%"></div>
+                                <div class="oi-bar put" style="height: 45%"></div>
+                                <div class="oi-bar put" style="height: 60%"></div>
+                                <div class="oi-bar put" style="height: 80%"></div>
+                                <div class="oi-bar put" style="height: 65%"></div>
+                                <div class="oi-bar" style="height: 40%"></div>
+                                <div class="oi-bar" style="height: 55%"></div>
+                                <div class="oi-bar" style="height: 75%"></div>
+                                <div class="oi-bar" style="height: 90%"></div>
+                                <div class="oi-bar" style="height: 70%"></div>
+                            </div>
+                            <div class="scanning-overlay"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Key Metrics -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Institutional Flow Metrics</h3>
+                        </div>
+                        <div class="setup-details">
+                            <div class="setup-item">
+                                <div class="setup-label">Put/Call Ratio</div>
+                                <div class="setup-value">0.87</div>
+                            </div>
+                            <div class="setup-item">
+                                <div class="setup-label">OI Change 24h</div>
+                                <div class="setup-value" style="color: #00ff88;">+14.2%</div>
+                            </div>
+                            <div class="setup-item">
+                                <div class="setup-label">Max Pain</div>
+                                <div class="setup-value">$445.00</div>
+                            </div>
+                            <div class="setup-item">
+                                <div class="setup-label">IV Rank</div>
+                                <div class="setup-value">32.4%</div>
+                            </div>
+                            <div class="setup-item">
+                                <div class="setup-label">Flow Direction</div>
+                                <div class="setup-value" style="color: #00ff88;">BULLISH</div>
+                            </div>
+                            <div class="setup-item">
+                                <div class="setup-label">Smart Money</div>
+                                <div class="setup-value">ACCUMULATING</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Trade Setup -->
+                <div class="trade-setup">
+                    <div class="setup-header">
+                        <div class="setup-type">🎯 HIGH CONVICTION TRADE</div>
+                        <div class="setup-confidence" style="color: #00ff88;">87% Probability</div>
+                    </div>
+                    <div class="setup-details">
+                        <div class="setup-item">
+                            <div class="setup-label">Strategy</div>
+                            <div class="setup-value">Buy CALL</div>
+                        </div>
+                        <div class="setup-item">
+                            <div class="setup-label">Strike</div>
+                            <div class="setup-value">$450</div>
+                        </div>
+                        <div class="setup-item">
+                            <div class="setup-label">Expiration</div>
+                            <div class="setup-value">Oct 18, 2025 (79 DTE)</div>
+                        </div>
+                        <div class="setup-item">
+                            <div class="setup-label">Entry Zone</div>
+                            <div class="setup-value">$446.50 - $447.50</div>
+                        </div>
+                        <div class="setup-item">
+                            <div class="setup-label">Target</div>
+                            <div class="setup-value">$455.00</div>
+                        </div>
+                        <div class="setup-item">
+                            <div class="setup-label">Stop Loss</div>
+                            <div class="setup-value">$444.25</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Signal Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Top Trading Signals</h3>
+                    </div>
+                    <table class="signal-table">
+                        <thead>
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Signal Strength</th>
+                                <th>Direction</th>
+                                <th>Success Probability</th>
+                                <th>Suggested Strike</th>
+                                <th>Expiration</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="font-weight: 700;">SPY</td>
+                                <td><span class="signal-strength strong">STRONG</span></td>
+                                <td style="color: #00ff88;">CALL</td>
+                                <td>
+                                    <div class="probability-meter">
+                                        <div class="probability-bar">
+                                            <div class="probability-fill" style="width: 87%;"></div>
+                                        </div>
+                                        <span>87%</span>
+                                    </div>
+                                </td>
+                                <td>$450</td>
+                                <td>Oct 18, 2025</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 700;">NVDA</td>
+                                <td><span class="signal-strength strong">STRONG</span></td>
+                                <td style="color: #00ff88;">CALL</td>
+                                <td>
+                                    <div class="probability-meter">
+                                        <div class="probability-bar">
+                                            <div class="probability-fill" style="width: 82%;"></div>
+                                        </div>
+                                        <span>82%</span>
+                                    </div>
+                                </td>
+                                <td>$950</td>
+                                <td>Oct 18, 2025</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 700;">QQQ</td>
+                                <td><span class="signal-strength moderate">MODERATE</span></td>
+                                <td style="color: #ff4444;">PUT</td>
+                                <td>
+                                    <div class="probability-meter">
+                                        <div class="probability-bar">
+                                            <div class="probability-fill" style="width: 71%;"></div>
+                                        </div>
+                                        <span>71%</span>
+                                    </div>
+                                </td>
+                                <td>$385</td>
+                                <td>Oct 11, 2025</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 700;">TSLA</td>
+                                <td><span class="signal-strength moderate">MODERATE</span></td>
+                                <td style="color: #00ff88;">CALL</td>
+                                <td>
+                                    <div class="probability-meter">
+                                        <div class="probability-bar">
+                                            <div class="probability-fill" style="width: 68%;"></div>
+                                        </div>
+                                        <span>68%</span>
+                                    </div>
+                                </td>
+                                <td>$195</td>
+                                <td>Oct 25, 2025</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Alert Popup -->
+    <div class="alert-popup">
+        <div class="alert-icon">!</div>
+        <div>
+            <div style="font-weight: 600;">New Signal Detected</div>
+            <div style="font-size: 14px; color: #888;">SPY showing institutional accumulation at $447</div>
+        </div>
+    </div>
+</body>
+</html>
