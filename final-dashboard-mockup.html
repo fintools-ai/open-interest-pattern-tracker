@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OI Pattern Tracker - Daily Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            line-height: 1.5;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff;
+        }
+        
+        .header-stats {
+            display: flex;
+            gap: 40px;
+        }
+        
+        .header-stat {
+            text-align: center;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+        }
+        
+        .stat-value.green { color: #00ff88; }
+        .stat-value.red { color: #ff4444; }
+        .stat-value.yellow { color: #ffaa00; }
+        
+        /* Market Pulse Section */
+        .market-pulse {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .pulse-icon {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .pulse-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 20px;
+        }
+        
+        .pulse-card {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        .pulse-metric {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .pulse-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .pulse-change {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        
+        .positive { color: #00ff88; }
+        .negative { color: #ff4444; }
+        
+        /* High Conviction Trades */
+        .conviction-section {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .trade-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        
+        .trade-card {
+            background: #1a1a1a;
+            border: 2px solid #333;
+            border-radius: 10px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .trade-card.bullish {
+            border-left: 4px solid #00ff88;
+        }
+        
+        .trade-card.bearish {
+            border-left: 4px solid #ff4444;
+        }
+        
+        .trade-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        
+        .ticker {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+        }
+        
+        .confidence-badge {
+            background: #00ff88;
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .pattern-type {
+            color: #00ff88;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+        
+        .trade-details {
+            background: #0a0a0a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .trade-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .trade-label {
+            color: #888;
+            font-size: 13px;
+        }
+        
+        .trade-value {
+            color: #fff;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        .evidence-list {
+            list-style: none;
+            margin-top: 15px;
+        }
+        
+        .evidence-list li {
+            font-size: 12px;
+            color: #ccc;
+            padding: 4px 0;
+            padding-left: 15px;
+            position: relative;
+        }
+        
+        .evidence-list li:before {
+            content: "•";
+            color: #00ff88;
+            position: absolute;
+            left: 0;
+        }
+        
+        /* Risk Monitor */
+        .risk-section {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .risk-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+        
+        .risk-card {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #333;
+        }
+        
+        .risk-metric {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        
+        .risk-value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+        
+        /* Trade Recommendations Table */
+        .recommendations-section {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .recommendations-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1a1a1a;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .recommendations-table th {
+            background: #0a0a0a;
+            padding: 15px 12px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #888;
+            font-weight: 600;
+            border-bottom: 1px solid #333;
+        }
+        
+        .recommendations-table td {
+            padding: 15px 12px;
+            border-bottom: 1px solid #222;
+            font-size: 14px;
+        }
+        
+        .recommendations-table tr:hover {
+            background: #222;
+        }
+        
+        .ticker-cell {
+            font-weight: 700;
+            font-size: 16px;
+            color: #fff;
+        }
+        
+        .direction-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .direction-badge.call {
+            background: #00ff88;
+            color: #000;
+        }
+        
+        .direction-badge.put {
+            background: #ff4444;
+            color: #fff;
+        }
+        
+        .probability-cell {
+            font-weight: 700;
+            font-size: 16px;
+        }
+        
+        /* OI Heatmap */
+        .heatmap-section {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 25px;
+        }
+        
+        .heatmap-container {
+            height: 300px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            font-size: 14px;
+            border: 1px solid #333;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #333;
+            margin-top: 40px;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .last-update {
+            color: #888;
+            font-size: 11px;
+            text-align: right;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">OI Pattern Tracker</div>
+            <div class="header-stats">
+                <div class="header-stat">
+                    <div class="stat-label">Patterns Found</div>
+                    <div class="stat-value">12</div>
+                </div>
+                <div class="header-stat">
+                    <div class="stat-label">Stocks Analyzed</div>
+                    <div class="stat-value">247</div>
+                </div>
+                <div class="header-stat">
+                    <div class="stat-label">Success Rate</div>
+                    <div class="stat-value green">76.5%</div>
+                </div>
+                <div class="header-stat">
+                    <div class="stat-label">Active Signals</div>
+                    <div class="stat-value yellow">8</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Market Pulse -->
+        <div class="market-pulse">
+            <div class="section-title">
+                <div class="pulse-icon"></div>
+                Market Pulse - January 15, 2025
+            </div>
+            <div class="pulse-grid">
+                <div class="pulse-card">
+                    <div class="pulse-metric">Overall Sentiment</div>
+                    <div class="pulse-value positive">BULLISH 72%</div>
+                    <div class="pulse-change positive">+5% vs yesterday</div>
+                </div>
+                <div class="pulse-card">
+                    <div class="pulse-metric">Institutional Flow</div>
+                    <div class="pulse-value positive">↑ $2.3B Net Calls</div>
+                    <div class="pulse-change positive">+$850M from Friday</div>
+                </div>
+                <div class="pulse-card">
+                    <div class="pulse-metric">VIX Level</div>
+                    <div class="pulse-value red">18.5</div>
+                    <div class="pulse-change positive">+2.1% today</div>
+                </div>
+                <div class="pulse-card">
+                    <div class="pulse-metric">Key Events</div>
+                    <div class="pulse-value">Fed Meeting</div>
+                    <div class="pulse-change">Wednesday 2PM</div>
+                </div>
+                <div class="pulse-card">
+                    <div class="pulse-metric">Gamma Exposure</div>
+                    <div class="pulse-value negative">-$1.2B</div>
+                    <div class="pulse-change">Short gamma setup</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- High Conviction Trades -->
+        <div class="conviction-section">
+            <div class="section-title">🎯 High Conviction Trades</div>
+            <div class="trade-cards">
+                <div class="trade-card bullish">
+                    <div class="trade-header">
+                        <div class="ticker">AAPL</div>
+                        <div class="confidence-badge">85% CONFIDENCE</div>
+                    </div>
+                    <div class="pattern-type">BULLISH BREAKOUT</div>
+                    <div class="trade-details">
+                        <div class="trade-row">
+                            <span class="trade-label">Entry:</span>
+                            <span class="trade-value">Buy 190/195 Call Spread @ $1.85</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Target:</span>
+                            <span class="trade-value">$3.50 (+89% profit)</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Stop Loss:</span>
+                            <span class="trade-value">$0.90 (-51% loss)</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Risk/Reward:</span>
+                            <span class="trade-value">1:3.2</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Expiry:</span>
+                            <span class="trade-value">Jan 31, 2025 (16 DTE)</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Success Probability:</span>
+                            <span class="trade-value positive">78%</span>
+                        </div>
+                    </div>
+                    <ul class="evidence-list">
+                        <li>25,000 contract sweep at 190 strike (unusual activity)</li>
+                        <li>Call OI increased 125% with minimal put activity</li>
+                        <li>Gamma exposure flip point at 188 - dealers short gamma</li>
+                        <li>Historical 78% win rate on similar accumulation patterns</li>
+                        <li>IV rank at 35th percentile - favorable for long options</li>
+                    </ul>
+                </div>
+                
+                <div class="trade-card bearish">
+                    <div class="trade-header">
+                        <div class="ticker">SPY</div>
+                        <div class="confidence-badge" style="background: #ff4444;">81% CONFIDENCE</div>
+                    </div>
+                    <div class="pattern-type" style="color: #ff4444;">PUT WALL FORMATION</div>
+                    <div class="trade-details">
+                        <div class="trade-row">
+                            <span class="trade-label">Entry:</span>
+                            <span class="trade-value">Buy 585/580 Put Spread @ $1.90</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Target:</span>
+                            <span class="trade-value">$3.80 (+100% profit)</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Stop Loss:</span>
+                            <span class="trade-value">$0.95 (-50% loss)</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Risk/Reward:</span>
+                            <span class="trade-value">1:2.8</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Expiry:</span>
+                            <span class="trade-value">Jan 17, 2025 (2 DTE)</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Success Probability:</span>
+                            <span class="trade-value negative">81%</span>
+                        </div>
+                    </div>
+                    <ul class="evidence-list">
+                        <li>Massive 51,294 put OI at 585 strike (institutional hedging)</li>
+                        <li>Put/call ratio spiked to 2.38 - extreme bearish positioning</li>
+                        <li>Max pain at 590 - price likely to drift lower</li>
+                        <li>VIX call buying suggests volatility expansion</li>
+                        <li>Fed meeting uncertainty driving protective positioning</li>
+                    </ul>
+                </div>
+                
+                <div class="trade-card bullish">
+                    <div class="trade-header">
+                        <div class="ticker">NVDA</div>
+                        <div class="confidence-badge">76% CONFIDENCE</div>
+                    </div>
+                    <div class="pattern-type">GAMMA SQUEEZE SETUP</div>
+                    <div class="trade-details">
+                        <div class="trade-row">
+                            <span class="trade-label">Entry:</span>
+                            <span class="trade-value">Buy 980 Call @ $12.50</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Target:</span>
+                            <span class="trade-value">$25.00 (+100% profit)</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Stop Loss:</span>
+                            <span class="trade-value">$6.25 (-50% loss)</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Risk/Reward:</span>
+                            <span class="trade-value">1:2.0</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Expiry:</span>
+                            <span class="trade-value">Jan 24, 2025 (9 DTE)</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Success Probability:</span>
+                            <span class="trade-value positive">76%</span>
+                        </div>
+                    </div>
+                    <ul class="evidence-list">
+                        <li>67,000 call OI at 980 strike - potential pin level</li>
+                        <li>Dealer short gamma above 975 - accelerated moves likely</li>
+                        <li>Earnings momentum + AI catalyst potential</li>
+                        <li>Historical 75% success on similar gamma setups</li>
+                        <li>Low IV environment favors long gamma positions</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Risk Monitor -->
+        <div class="risk-section">
+            <div class="section-title">⚡ Portfolio Risk Monitor</div>
+            <div class="risk-grid">
+                <div class="risk-card">
+                    <div class="risk-metric">Value at Risk (95%)</div>
+                    <div class="risk-value negative">-$12,450</div>
+                </div>
+                <div class="risk-card">
+                    <div class="risk-metric">Delta Exposure</div>
+                    <div class="risk-value positive">+$45,000</div>
+                </div>
+                <div class="risk-card">
+                    <div class="risk-metric">Theta Decay (Daily)</div>
+                    <div class="risk-value negative">-$850</div>
+                </div>
+                <div class="risk-card">
+                    <div class="risk-metric">Max Position Risk</div>
+                    <div class="risk-value">2.5%</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- All Trade Recommendations -->
+        <div class="recommendations-section">
+            <div class="section-title">📋 Complete Trade Recommendations</div>
+            <table class="recommendations-table">
+                <thead>
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Pattern</th>
+                        <th>Direction</th>
+                        <th>Entry</th>
+                        <th>Target</th>
+                        <th>Expiry</th>
+                        <th>Success Prob</th>
+                        <th>R/R</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="ticker-cell">AAPL</td>
+                        <td>Bullish Breakout</td>
+                        <td><span class="direction-badge call">CALL</span></td>
+                        <td>190/195 Spread @ $1.85</td>
+                        <td>$3.50</td>
+                        <td>Jan 31 (16 DTE)</td>
+                        <td class="probability-cell positive">78%</td>
+                        <td>1:3.2</td>
+                    </tr>
+                    <tr>
+                        <td class="ticker-cell">SPY</td>
+                        <td>Put Wall Formation</td>
+                        <td><span class="direction-badge put">PUT</span></td>
+                        <td>585/580 Spread @ $1.90</td>
+                        <td>$3.80</td>
+                        <td>Jan 17 (2 DTE)</td>
+                        <td class="probability-cell negative">81%</td>
+                        <td>1:2.8</td>
+                    </tr>
+                    <tr>
+                        <td class="ticker-cell">NVDA</td>
+                        <td>Gamma Squeeze</td>
+                        <td><span class="direction-badge call">CALL</span></td>
+                        <td>980 Call @ $12.50</td>
+                        <td>$25.00</td>
+                        <td>Jan 24 (9 DTE)</td>
+                        <td class="probability-cell positive">76%</td>
+                        <td>1:2.0</td>
+                    </tr>
+                    <tr>
+                        <td class="ticker-cell">QQQ</td>
+                        <td>Institutional Accumulation</td>
+                        <td><span class="direction-badge call">CALL</span></td>
+                        <td>490/495 Spread @ $2.10</td>
+                        <td>$4.20</td>
+                        <td>Jan 31 (16 DTE)</td>
+                        <td class="probability-cell positive">73%</td>
+                        <td>1:2.5</td>
+                    </tr>
+                    <tr>
+                        <td class="ticker-cell">TSLA</td>
+                        <td>Short Interest Squeeze</td>
+                        <td><span class="direction-badge call">CALL</span></td>
+                        <td>180/185 Spread @ $1.75</td>
+                        <td>$3.25</td>
+                        <td>Jan 24 (9 DTE)</td>
+                        <td class="probability-cell positive">71%</td>
+                        <td>1:2.3</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- OI Heatmap -->
+        <div class="heatmap-section">
+            <div class="section-title">🗺️ Open Interest Heatmap</div>
+            <div class="heatmap-container">
+                Interactive Strike vs Expiry Grid Would Display Here
+                <br>(D3.js or Plotly visualization showing OI intensity by strike/expiry)
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div>OI Pattern Tracker v2.0 | Institutional-grade options flow analysis</div>
+            <div class="last-update">Last updated: January 15, 2025 at 4:15 PM ET | Next analysis: 4:15 PM ET tomorrow</div>
+        </div>
+    </div>
+</body>
+</html>
