@@ -1,0 +1,25 @@
+# Core Framework
+redis>=6.0.0
+boto3>=1.34.0
+botocore>=1.34.0
+
+# Data Processing  
+pandas>=2.0.0
+numpy>=1.24.0
+aiohttp>=3.8.0
+
+# MCP Integration
+mcp>=0.1.0
+
+# Web & Templates
+jinja2>=3.1.0
+
+# Utilities
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+structlog>=23.0.0
+
+# Development & Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
