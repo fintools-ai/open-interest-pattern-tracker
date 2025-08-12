@@ -5,27 +5,30 @@ LLM Analyzer - Uses AWS Bedrock to analyze OI patterns and generate trade recomm
 import json
 import boto3
 from datetime import datetime
-from config.settings import AWS_REGION, BEDROCK_MODEL_ID
+from config.settings import AWS_REGION, BEDROCK_MODEL_ID, TARGET_DTE
 
 class LLMAnalyzer:
     def __init__(self):
         self.bedrock_client = boto3.client('bedrock-runtime', region_name=AWS_REGION)
         self.model_id = BEDROCK_MODEL_ID
     
-    async def analyze_ticker(self, ticker_data, delta_data, market_context=None, price_data=None):
+    def analyze_ticker(self, ticker_data, delta_data, market_context=None, price_data=None):
         """Analyze OI data with current prices and technical zones to generate trading recommendations"""
         try:
             prompt = self._build_analysis_prompt(ticker_data, delta_data, market_context, price_data)
             
-            response = await self._call_bedrock(prompt)
+            #print(prompt)
+            #print("--------------------------------------------------")
+            response = self._call_bedrock(prompt)
             
             analysis = self._parse_response(response)
             analysis["ticker"] = ticker_data.get("ticker", "UNKNOWN")
             analysis["analysis_timestamp"] = datetime.now().isoformat()
             
-            # Add current price to analysis if available
-            if price_data and price_data.get("current_price"):
-                analysis["current_price"] = price_data["current_price"]
+
+            
+            # Let LLM extract current price from market data
+            # Current price will be filled by LLM from the market data provided
             
             return analysis
             
@@ -38,133 +41,188 @@ class LLMAnalyzer:
             }
     
     def _build_analysis_prompt(self, ticker_data, delta_data, market_context, price_data):
-        """Build comprehensive analysis prompt for Bedrock with current price and technical zones"""
+        """Build simple prompt with raw data dumps"""
         ticker = ticker_data.get("ticker", "UNKNOWN")
-        latest_date = max(ticker_data.get("data_by_date", {}).keys())
-        current_oi = ticker_data["data_by_date"][latest_date]
         
-        # Build market context section
-        market_section = ""
-        if market_context:
-            market_section = f"""
-## Market Context
-- Market Regime: {market_context.get('regime', 'Unknown')}
-- VIX Fear Level: {market_context.get('fear_level', 'Unknown')}
-- Volatility Expectation: {market_context.get('volatility_expectation', 'Unknown')}
-- Market Summary: {market_context.get('market_summary', 'No summary available')}
-"""
-        
-        # Build price and technical zones section
-        price_section = ""
-        if price_data:
-            current_price = price_data.get('current_price', 'Unknown')
-            price_section = f"""
-## Current Market Price & Technical Zones
-- **Current Price**: ${current_price}
-- **Price vs Max Pain**: Current ${current_price} vs Max Pain ${current_oi.get('max_pain', 'N/A')} (Distance: ${abs(float(current_price) - float(current_oi.get('max_pain', 0))):.2f})
-"""
-            
-            # Add technical zones if available
-            if price_data.get('timeframe_zones'):
-                # Extract 5m zones for primary analysis
-                zones_5m = price_data.get('timeframe_zones', {}).get('5m', {})
-                if zones_5m and zones_5m.get('zones'):
-                    price_section += "\n### Key Technical Zones (5-minute):\n"
-                    for zone in zones_5m['zones'][:5]:  # Top 5 zones
-                        price_section += f"- {zone['type']}: ${zone['level']:.2f} ({zone['source']}) - Strength: {zone['strength']}\n"
-                
-                # Add 1m zones for scalping context
-                zones_1m = price_data.get('timeframe_zones', {}).get('1m', {})
-                if zones_1m and zones_1m.get('zones'):
-                    price_section += "\n### Scalping Zones (1-minute):\n"
-                    for zone in zones_1m['zones'][:3]:  # Top 3 zones
-                        price_section += f"- {zone['type']}: ${zone['level']:.2f} - {zone['source']}\n"
-"""
-        
-        prompt = f"""# Enhanced Options Open Interest Analysis with Price Context - {latest_date}
+        prompt = f"""You are a professional options trader with 15+ years experience. Analyze this comprehensive dataset for {ticker} like you're preparing a trading desk report.
 
-## Analysis Target: {ticker}
-{market_section}{price_section}
-## Your Role
-You are an expert institutional options analyst with access to current price data and technical zones. Analyze this comprehensive data to identify high-probability trading opportunities with 70%+ success rates.
+IMPORTANT: Use exactly {TARGET_DTE} days to expiration (DTE) for all recommendations.
 
-Focus on:
-1. **Moneyness Analysis**: Determine which strikes are ITM/ATM/OTM based on current price
-2. **Pin Risk Assessment**: Calculate proximity to max OI strikes and pin risk potential
-3. **Gamma Exposure**: Identify if we're near high-gamma strikes (dealer hedging zones)
-4. **Strike Clustering vs Technical Zones**: Compare high OI strikes with technical support/resistance
-5. **Put/Call Ratio Context**: Differentiate hedging (ITM) vs speculation (OTM)
-6. **Max Pain Magnetism**: Assess likelihood of price moving toward max pain
+# RAW DATA
 
-## Current OI Data for {ticker}
-- Put/Call Ratio: {current_oi.get('put_call_ratio', 'N/A')}
-- Max Pain: ${current_oi.get('max_pain', 'N/A')}
-- Total OI: {current_oi.get('total_oi', 'N/A'):,}
-- Call OI: {current_oi.get('call_oi', 'N/A'):,}
-- Put OI: {current_oi.get('put_oi', 'N/A'):,}
+## Open Interest Data:
+{json.dumps(ticker_data, indent=2)}
 
-### Strike Data
-Call Strikes: {json.dumps(current_oi.get('strikes', {}).get('calls', {}), indent=2)}
-Put Strikes: {json.dumps(current_oi.get('strikes', {}).get('puts', {}), indent=2)}
+## Delta Changes:
+{json.dumps(delta_data, indent=2)}
 
-## Day-over-Day Changes
-- Put/Call Ratio Change: {delta_data.get('put_call_ratio_delta', 'N/A')}
-- Max Pain Shift: ${delta_data.get('max_pain_shift', 'N/A')}
-- Total OI Change: {delta_data.get('total_oi_change', 'N/A'):,} ({delta_data.get('total_oi_pct_change', 0):.1f}%)
-- Call OI Change: {delta_data.get('call_oi_change', 'N/A'):,} ({delta_data.get('call_oi_pct_change', 0):.1f}%)
-- Put OI Change: {delta_data.get('put_oi_change', 'N/A'):,} ({delta_data.get('put_oi_pct_change', 0):.1f}%)
+## Market Context (VIX, etc):
+{json.dumps(market_context, indent=2) if market_context else 'None'}
 
-### Large OI Increases
-{json.dumps(delta_data.get('large_oi_increases', []), indent=2)}
+## Multi-Timeframe Technical Analysis:
+{json.dumps(price_data, indent=2) if price_data else 'None'}
 
-### New Strikes
-New Call Strikes: {json.dumps(delta_data.get('new_call_strikes', []), indent=2)}
-New Put Strikes: {json.dumps(delta_data.get('new_put_strikes', []), indent=2)}
+# PROFESSIONAL ANALYSIS REQUIREMENTS
 
-### Unusual Activity Flags
-{json.dumps(delta_data.get('unusual_activity', []), indent=2)}
+Analyze like a seasoned options trader with deep focus on OPEN INTEREST INTELLIGENCE:
 
-## Required Output
-Return response as JSON with this EXACT structure:
+# CRITICAL / MOST IMPORTANT
+Use Open interest data as the primary source of analysis, use the technical data just for reference, but they are not the main deciding factor. The goal is to get as much insight from
+open interest data, this is the most critical data and all analysis should be based on this data set ONLY.
+
+**CRITICAL**: Pay special attention to OI delta changes, unusual strike activity, and institutional positioning clues. The technical analysis should SUPPORT the OI story, not lead it.
+
+
+
+## PRIMARY FOCUS - SMART MONEY DETECTION:
+1. **OI Flow Analysis**: Decode what institutions are doing - are they accumulating, distributing, or hedging?
+2. **Strike Concentration**: Which strikes have unusual OI buildup? What does this tell us about expected moves?
+3. **Put/Call OI Shifts**: How are institutional put/call ratios changing? What's the hedging story?
+4. **Volume vs OI**: Are we seeing new positions (high volume, rising OI) or position unwinding?
+5. **Dark Pool Signals**: Large block OI changes without corresponding volume = institutional stealth positioning
+6. **Dealer Positioning**: How are market makers positioned? Where will they hedge?
+7. **Institutional Footprints**: Large block trades, unusual strike clustering, gamma exposure zones
+8. **Smart Money Timing**: When are institutions entering positions? Pre-earnings, pre-events?
+
+## SECONDARY ANALYSIS:
+6. **Multi-Timeframe Confluence**: How do 1m, 5m, 1d technicals align with OI patterns?
+7. **Risk/Reward Assessment**: Precise entry, stops, targets based on technical levels
+8. **Market Regime Context**: How does current volatility environment affect this setup?
+9. **Position Management**: Specific rules for trade management and adjustments
+
+
+CRITICAL OUTPUT FORMATTING RULES:
+1. For ALL price fields (entry_price, target_price, stop_loss), use STOCK PRICES not option premiums
+2. Provide ONLY numeric values without $ signs (e.g., 175.50 not $175.50)
+3. For percentage fields, provide ONLY numeric values without % signs (e.g., 75 not 75%)
+4. entry_price = the STOCK price level for entering the trade
+5. target_price = the STOCK price target where you'd take profits
+6. stop_loss = the STOCK price level where you'd exit at a loss
+7. Extract current stock price from technical data and put in current_price as plain number
+
+IMPORTANT: ALL prices should be STOCK prices, not option premiums. This makes it clear where the underlying stock should be for entry/exit.
+
+## MANDATORY TRADING STRATEGY RULES:
+1. **ONLY use these 3 trade types**: Buy Call, Buy Put, Put Credit Spread
+2. **Buy Call**: When smart money is accumulating calls, gamma squeeze setup, or strong bullish OI flow
+3. **Buy Put**: When smart money is accumulating puts, distribution detected, or strong bearish OI flow  
+4. **Put Credit Spread**: When high put OI concentration suggests support level, or neutral-to-bullish bias with high IV
+
+## CRITICAL REQUIREMENT - NO EXCEPTIONS:
+You MUST provide a trade recommendation for THIS ticker regardless of:
+- Data quality concerns
+- Low confidence scores
+- Uncertain market conditions
+- Missing information
+Even if you have minimal data, analyze what's available and pick the MOST LIKELY direction based on any OI patterns you can detect.
+
+Return JSON with this enhanced structure that extracts MAXIMUM intelligence from the open interest data:
+
+
 
 {{
   "market_summary": {{
     "overall_sentiment": "Bullish/Bearish/Neutral with confidence %",
-    "key_observations": ["observation1", "observation2", "observation3"],
-    "risk_factors": ["risk1", "risk2"]
+    "key_observations": ["observation1", "observation2"],
+    "risk_factors": ["risk1", "risk2"],
+    "institutional_flow": "Smart money positioning analysis",
+    "volatility_regime": "High/Medium/Low volatility environment",
+    "smart_money_thesis": "What institutions are positioning for based on OI"
   }},
   "pattern_analysis": {{
     "pattern_type": "institutional_accumulation|short_squeeze_setup|gamma_squeeze_setup|distribution|protective_hedging|other",
     "pattern_strength": "strong|moderate|weak",
-    "supporting_evidence": ["evidence1", "evidence2", "evidence3"],
-    "confidence_score": 85
+    "supporting_evidence": ["evidence1", "evidence2"],
+    "confidence_score": "Calculate based on OI strength and technical confluence",
+    "oi_intelligence": {{
+      "strike_concentration": "Key strikes with unusual OI buildup",
+      "flow_direction": "Institutional buying/selling/hedging",
+      "position_type": "New positions vs unwinding vs rolling",
+      "size_significance": "Large/medium/small institutional footprint"
+    }}
   }},
   "trade_recommendation": {{
-    "direction": "CALL|PUT|NEUTRAL",
-    "instrument": "Call Spread|Put Spread|Long Call|Long Put",
-    "specific_entry": "Exact trade description with strikes",
-    "entry_price": "$X.XX",
-    "target_price": "$X.XX",
-    "stop_loss": "$X.XX",
+    "direction": "CALL|PUT",
+    "instrument": "Buy Call|Buy Put|Put Credit Spread",
+    "specific_entry": "Detailed trade description with strike selection rationale - ONLY use Buy Call, Buy Put, or Put Credit Spread strategies",
+    "entry_price": 175.50,
+    "target_price": 185.00,
+    "stop_loss": 170.00,
     "expiry_date": "YYYY-MM-DD",
-    "days_to_expiry": X,
-    "risk_reward_ratio": "1:X.X",
-    "success_probability": 78,
-    "position_size_pct": 2.5
+    "days_to_expiry": {TARGET_DTE},
+    "risk_reward_ratio": "1:2.0",
+    "success_probability": 75,
+    "position_size_pct": 2.5,
+    "current_price": 176.25,
+    "timeframe_confluence": "1m/5m/1d alignment analysis",
+    "entry_triggers": ["trigger1", "trigger2"],
+    "exit_strategy": "Detailed exit plan"
   }},
   "risk_management": {{
     "primary_risks": ["risk1", "risk2"],
-    "hedge_strategy": "hedge description if needed",
-    "volatility_considerations": "IV analysis"
+    "hedge_strategy": "hedge description",
+    "volatility_considerations": "IV analysis",
+    "position_adjustments": "When and how to adjust",
+    "correlation_risks": "Portfolio correlation analysis"
+  }},
+  "technical_analysis": {{
+    "multi_timeframe_summary": "1m/5m/1d trend alignment",
+    "key_levels": {{
+      "support": "$X.XX",
+      "resistance": "$X.XX",
+      "pivot": "$X.XX"
+    }},
+    "momentum_indicators": "RSI/MACD/Stoch analysis",
+    "volume_analysis": "OBV/CMF institutional flow",
+    "volatility_metrics": "ATR/IV analysis"
+  }},
+  "smart_money_insights": {{
+    "oi_concentration_zones": {{
+      "heavy_call_strikes": [
+        {{"strike": 640, "oi": 42885, "interpretation": "Major resistance/profit target"}},
+        {{"strike": 645, "oi": 27423, "interpretation": "Secondary target level"}}
+      ],
+      "heavy_put_strikes": [
+        {{"strike": 620, "oi": 58882, "interpretation": "Major support/hedge level"}},
+        {{"strike": 610, "oi": 119307, "interpretation": "Institutional protection zone"}}
+      ],
+      "concentration_analysis": "Describe what the strike clustering reveals"
+    }},
+    "flow_analysis": {{
+      "net_positioning": "Bullish/Bearish based on OI changes",
+      "large_blocks": ["Large OI additions at specific strikes"],
+      "unusual_activity": ["Unusual patterns detected"],
+      "dark_pool_signals": "Stealth positioning if detected"
+    }},
+    "put_call_dynamics": {{
+      "ratio": 1.21,
+      "change": -0.05,
+      "interpretation": "What the P/C ratio reveals",
+      "smart_money_view": "Institutional hedging vs directional bets"
+    }},
+    "max_pain_analysis": {{
+      "level": 634.0,
+      "shift": 2.0,
+      "pin_risk": "High/Medium/Low",
+      "dealer_impact": "How dealers will hedge"
+    }},
+    "gamma_analysis": {{
+      "net_exposure": "Positive/Negative gamma zones",
+      "flip_point": 632.5,
+      "squeeze_risk": "High/Medium/Low",
+      "volatility_impact": "Expected volatility behavior"
+    }}
   }}
 }}
 
-CRITICAL: Only recommend trades with confidence_score >= 70 and success_probability >= 70. If confidence is below 70, set direction to "NEUTRAL".
+CRITICAL: You MUST classify every ticker as either CALL or PUT direction - NO NEUTRAL allowed. Even if confidence is low, pick the most likely direction based on the data. Provide analysis and recommendations for ALL tickers regardless of confidence or success probability.
 """
         return prompt
     
-    async def _call_bedrock(self, prompt):
+    def _call_bedrock(self, prompt):
         """Call AWS Bedrock with the analysis prompt"""
+        print("Calling Bedrock with prompt: ", prompt[:100])
+
         request_body = {
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": 4000,
@@ -180,7 +238,7 @@ CRITICAL: Only recommend trades with confidence_score >= 70 and success_probabil
             modelId=self.model_id,
             body=json.dumps(request_body)
         )
-        
+  
         response_body = json.loads(response['body'].read())
         return response_body['content'][0]['text']
     
@@ -206,13 +264,15 @@ CRITICAL: Only recommend trades with confidence_score >= 70 and success_probabil
             confidence = analysis["pattern_analysis"].get("confidence_score", 0)
             success_prob = analysis["trade_recommendation"].get("success_probability", 0)
             
-            if confidence < 70 or success_prob < 70:
-                analysis["trade_recommendation"]["direction"] = "NEUTRAL"
-                if "key_observations" not in analysis["market_summary"]:
-                    analysis["market_summary"]["key_observations"] = []
-                analysis["market_summary"]["key_observations"].append(
-                    f"Low confidence ({confidence}%) or success probability ({success_prob}%) - trade not recommended"
-                )
+            # Convert to int if they're numeric, otherwise skip validation
+            try:
+                confidence = int(confidence) if isinstance(confidence, (int, float, str)) and str(confidence).isdigit() else 0
+                success_prob = int(success_prob) if isinstance(success_prob, (int, float, str)) and str(success_prob).isdigit() else 0
+            except (ValueError, TypeError):
+                confidence = 0
+                success_prob = 0
+            
+            # No filtering - show all recommendations regardless of confidence/success probability
             
             return analysis
             

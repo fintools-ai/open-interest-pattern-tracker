@@ -8,6 +8,31 @@ import json
 from datetime import datetime
 from jinja2 import Template
 
+def safe_int(value):
+    """Safely convert any value to integer, handling strings, percentages, quotes"""
+    try:
+        # Handle various formats: "75%", "75% - comment", 75, "75"
+        clean_value = str(value).replace('%', '').replace('"', '').replace("'", '').strip()
+        # Take only the first number if there's additional text
+        number_part = clean_value.split()[0] if clean_value else '0'
+        # Remove decimal part if present
+        number_part = number_part.split('.')[0]
+        return int(number_part) if number_part else 0
+    except (ValueError, TypeError):
+        return 0
+
+def safe_float(value, decimals=2):
+    """Safely convert any value to float with formatting"""
+    try:
+        # Handle various formats and clean the value
+        clean_value = str(value).replace('$', '').replace('%', '').replace('"', '').replace("'", '').strip()
+        # Take only the first number if there's additional text
+        number_part = clean_value.split()[0] if clean_value else '0'
+        result = float(number_part)
+        return f"{result:.{decimals}f}"
+    except (ValueError, TypeError):
+        return "0.00"
+
 class HTMLGenerator:
     def __init__(self, template_dir="src/output/templates", output_dir="output"):
         self.template_dir = template_dir
@@ -18,7 +43,7 @@ class HTMLGenerator:
         
         # Create date-specific subdirectory
         today = datetime.now().strftime('%Y-%m-%d')
-        self.daily_output_dir = os.path.join(output_dir, today)
+        self.daily_output_dir = os.path.join("/Users/sayantbh/Workspace/fintool/open-interest-pattern-tracker/output", today)
         os.makedirs(self.daily_output_dir, exist_ok=True)
         os.makedirs(os.path.join(self.daily_output_dir, "dashboards"), exist_ok=True)
         os.makedirs(os.path.join(self.daily_output_dir, "reports"), exist_ok=True)
@@ -100,7 +125,7 @@ class HTMLGenerator:
             # Market pulse data
             "market_pulse": market_pulse,
             
-            # High conviction trades (top 3 for featured cards)
+            # ALL trades for featured cards
             "high_conviction_trades": high_conviction_trades,
             
             # All recommendations for table
@@ -111,8 +136,7 @@ class HTMLGenerator:
             
             # Clustering summary
             "bullish_count": clusters["bullish_group"]["total_count"],
-            "bearish_count": clusters["bearish_group"]["total_count"],
-            "neutral_count": clusters["neutral_group"]["total_count"]
+            "bearish_count": clusters["bearish_group"]["total_count"]
         }
         
         return template_data
@@ -160,20 +184,20 @@ class HTMLGenerator:
         
         return pulse_data
     
-    def _get_high_conviction_trades(self, clusters, max_count=3):
-        """Get high conviction trades for featured cards"""
-        # Get top trades from each cluster
+    def _get_high_conviction_trades(self, clusters, max_count=10):
+        """Get ALL trades for featured cards"""
+        # Get ALL trades from each cluster
         bullish_trades = sorted(
             clusters["bullish_group"]["tickers"],
-            key=lambda x: x["confidence"] * x["success_probability"],
+            key=lambda x: safe_int(x["confidence"]) * safe_int(x["success_probability"]),
             reverse=True
-        )[:2]
+        )
         
         bearish_trades = sorted(
             clusters["bearish_group"]["tickers"],
-            key=lambda x: x["confidence"] * x["success_probability"],
+            key=lambda x: safe_int(x["confidence"]) * safe_int(x["success_probability"]),
             reverse=True
-        )[:1]
+        )
         
         high_conviction = []
         
@@ -183,15 +207,23 @@ class HTMLGenerator:
                 "ticker": trade["ticker"],
                 "pattern_type": trade["pattern_type"].replace("_", " ").title(),
                 "direction": "bullish",
-                "confidence": f"{trade['confidence']}%",
-                "entry": trade["entry"],
-                "target": trade["target"],
-                "stop_loss": trade["stop_loss"],
+                "confidence": f"{safe_int(trade['confidence'])}%",
+                "entry": f"${safe_float(trade['entry'])}" if str(trade['entry']).replace('.','').replace('-','').isdigit() or '.' in str(trade['entry']) else trade["entry"],
+                "target": f"${safe_float(trade['target'])}" if str(trade['target']).replace('.','').replace('-','').isdigit() or '.' in str(trade['target']) else trade["target"],
+                "stop_loss": f"${safe_float(trade['stop_loss'])}" if str(trade['stop_loss']).replace('.','').replace('-','').isdigit() or '.' in str(trade['stop_loss']) else trade["stop_loss"],
                 "risk_reward": trade["risk_reward"],
                 "expiry": trade["expiry"],
                 "dte": trade["dte"],
-                "success_prob": f"{trade['success_probability']}%",
-                "supporting_evidence": trade["supporting_evidence"][:4]  # Top 4 evidence points
+                "success_prob": f"{safe_int(trade['success_probability'])}%",
+                "current_price": trade["current_price"],
+                "supporting_evidence": trade["supporting_evidence"][:4],  # Top 4 evidence points
+                "timeframe_confluence": trade.get("timeframe_confluence", "Multi-timeframe aligned"),
+                "entry_triggers": trade.get("entry_triggers", ["Price confirmation", "Volume spike"]),
+                "technical_levels": trade.get("technical_levels", {}),
+                "volatility_regime": trade.get("volatility_regime", "Medium volatility"),
+                "institutional_flow": trade.get("institutional_flow", "Smart money positioning"),
+                "smart_money_thesis": trade.get("smart_money_thesis", "Institutional positioning detected"),
+                "smart_money_insights": trade.get("smart_money_insights", {})
             })
         
         # Add bearish trades
@@ -200,18 +232,28 @@ class HTMLGenerator:
                 "ticker": trade["ticker"],
                 "pattern_type": trade["pattern_type"].replace("_", " ").title(),
                 "direction": "bearish",
-                "confidence": f"{trade['confidence']}%",
-                "entry": trade["entry"],
-                "target": trade["target"],
-                "stop_loss": trade["stop_loss"],
+                "confidence": f"{safe_int(trade['confidence'])}%",
+                "entry": f"${safe_float(trade['entry'])}" if str(trade['entry']).replace('.','').replace('-','').isdigit() or '.' in str(trade['entry']) else trade["entry"],
+                "target": f"${safe_float(trade['target'])}" if str(trade['target']).replace('.','').replace('-','').isdigit() or '.' in str(trade['target']) else trade["target"],
+                "stop_loss": f"${safe_float(trade['stop_loss'])}" if str(trade['stop_loss']).replace('.','').replace('-','').isdigit() or '.' in str(trade['stop_loss']) else trade["stop_loss"],
                 "risk_reward": trade["risk_reward"],
                 "expiry": trade["expiry"],
                 "dte": trade["dte"],
-                "success_prob": f"{trade['success_probability']}%",
-                "supporting_evidence": trade["supporting_evidence"][:4]
+                "success_prob": f"{safe_int(trade['success_probability'])}%",
+                "current_price": trade["current_price"],
+                "supporting_evidence": trade["supporting_evidence"][:4],
+                "timeframe_confluence": trade.get("timeframe_confluence", "Multi-timeframe aligned"),
+                "entry_triggers": trade.get("entry_triggers", ["Price confirmation", "Volume spike"]),
+                "technical_levels": trade.get("technical_levels", {}),
+                "volatility_regime": trade.get("volatility_regime", "Medium volatility"),
+                "institutional_flow": trade.get("institutional_flow", "Smart money positioning"),
+                "smart_money_thesis": trade.get("smart_money_thesis", "Institutional positioning detected"),
+                "smart_money_insights": trade.get("smart_money_insights", {})
             })
         
-        return high_conviction[:max_count]
+
+        
+        return high_conviction  # Return ALL trades, not limited
     
     def _get_all_recommendations(self, clusters):
         """Get all recommendations for the main table"""
@@ -226,7 +268,7 @@ class HTMLGenerator:
                 "entry": trade["entry"],
                 "target": trade["target"],
                 "expiry": f"{trade['expiry']} ({trade['dte']} DTE)",
-                "success_prob": f"{trade['success_probability']}%",
+                "success_prob": f"{safe_int(trade['success_probability'])}%",
                 "risk_reward": trade["risk_reward"]
             })
         
@@ -239,12 +281,12 @@ class HTMLGenerator:
                 "entry": trade["entry"],
                 "target": trade["target"],
                 "expiry": f"{trade['expiry']} ({trade['dte']} DTE)",
-                "success_prob": f"{trade['success_probability']}%",
+                "success_prob": f"{safe_int(trade['success_probability'])}%",
                 "risk_reward": trade["risk_reward"]
             })
         
-        # Sort by success probability
-        recommendations.sort(key=lambda x: float(x["success_prob"].replace("%", "")), reverse=True)
+        # Sort by success probability using safe_int
+        recommendations.sort(key=lambda x: safe_int(x["success_prob"]), reverse=True)
         
         return recommendations
     
@@ -254,11 +296,11 @@ class HTMLGenerator:
         total_count = 0
         
         for ticker in clusters["bullish_group"]["tickers"]:
-            total_weighted += ticker["success_probability"]
+            total_weighted += safe_int(ticker["success_probability"])
             total_count += 1
         
         for ticker in clusters["bearish_group"]["tickers"]:
-            total_weighted += ticker["success_probability"]
+            total_weighted += safe_int(ticker["success_probability"])
             total_count += 1
         
         if total_count == 0:
@@ -276,7 +318,7 @@ class HTMLGenerator:
         portfolio_var = total_positions * avg_position_size * 1000 * -0.5  # Rough VaR estimate
         delta_exposure = total_positions * 15000  # Rough delta estimate
         theta_decay = total_positions * -150  # Daily theta estimate
-        max_position_risk = max(avg_position_size, 2.5)
+        max_position_risk = max(avg_position_size, 2.5) if total_positions > 0 else 2.5
         
         return {
             "portfolio_var": f"-${abs(portfolio_var):,.0f}",
@@ -326,12 +368,15 @@ class HTMLGenerator:
         .trade-card { background: #1a1a1a; border: 2px solid #333; border-radius: 10px; padding: 20px; position: relative; overflow: hidden; }
         .trade-card.bullish { border-left: 4px solid #00ff88; }
         .trade-card.bearish { border-left: 4px solid #ff4444; }
+
         .trade-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
         .ticker { font-size: 24px; font-weight: 700; color: #fff; }
         .confidence-badge { background: #00ff88; color: #000; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .confidence-badge.bearish { background: #ff4444; color: #fff; }
+
         .pattern-type { color: #00ff88; font-size: 14px; font-weight: 500; margin-bottom: 15px; text-transform: uppercase; }
         .pattern-type.bearish { color: #ff4444; }
+
         .trade-details { background: #0a0a0a; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
         .trade-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
         .trade-label { color: #888; font-size: 13px; }
@@ -420,7 +465,7 @@ class HTMLGenerator:
                 {% for trade in high_conviction_trades %}
                 <div class="trade-card {{trade.direction}}">
                     <div class="trade-header">
-                        <div class="ticker">{{trade.ticker}}</div>
+                        <div class="ticker">{{trade.ticker}} <span style="font-size: 16px; color: #888; font-weight: 400;">${{trade.current_price}}</span></div>
                         <div class="confidence-badge {% if trade.direction == 'bearish' %}bearish{% endif %}">{{trade.confidence}} CONFIDENCE</div>
                     </div>
                     <div class="pattern-type {% if trade.direction == 'bearish' %}bearish{% endif %}">{{trade.pattern_type}}</div>
@@ -449,38 +494,124 @@ class HTMLGenerator:
                             <span class="trade-label">Success Probability:</span>
                             <span class="trade-value {% if trade.direction == 'bullish' %}positive{% else %}negative{% endif %}">{{trade.success_prob}}</span>
                         </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Timeframe Confluence:</span>
+                            <span class="trade-value">{{trade.timeframe_confluence}}</span>
+                        </div>
+                        <div class="trade-row">
+                            <span class="trade-label">Volatility Regime:</span>
+                            <span class="trade-value">{{trade.volatility_regime}}</span>
+                        </div>
                     </div>
-                    <ul class="evidence-list">
-                        {% for evidence in trade.supporting_evidence %}
-                        <li>{{evidence}}</li>
-                        {% endfor %}
-                    </ul>
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Smart Money Analysis:</div>
+                        <div style="font-size: 12px; color: #ccc; margin-bottom: 8px;">{{trade.institutional_flow}}</div>
+                        <div style="font-size: 11px; color: #aaa;">{{trade.smart_money_thesis}}</div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Entry Triggers:</div>
+                        <div style="font-size: 12px; color: #ccc;">
+                            {% for trigger in trade.entry_triggers %}
+                            <span style="background: #333; padding: 2px 8px; border-radius: 4px; margin-right: 8px; margin-bottom: 4px; display: inline-block;">{{trigger}}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Key Levels:</div>
+                        <div style="font-size: 12px; color: #ccc;">
+                            <span style="background: #1a4d1a; padding: 2px 8px; border-radius: 4px; margin-right: 8px;">Support: {{trade.technical_levels.support}}</span>
+                            <span style="background: #4d1a1a; padding: 2px 8px; border-radius: 4px; margin-right: 8px;">Resistance: {{trade.technical_levels.resistance}}</span>
+                            <span style="background: #4d4d1a; padding: 2px 8px; border-radius: 4px;">Pivot: {{trade.technical_levels.pivot}}</span>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Supporting Evidence:</div>
+                        <ul class="evidence-list">
+                            {% for evidence in trade.supporting_evidence %}
+                            <li>{{evidence}}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% if trade.smart_money_insights %}
+                    <div class="smart-money-section" style="background: #1a1a1a; border: 1px solid #444; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                        <div style="font-size: 12px; color: #00ff88; margin-bottom: 12px; text-transform: uppercase; font-weight: 600;">🎯 Smart Money Intelligence</div>
+                        
+                        {% if trade.smart_money_insights.oi_concentration_zones %}
+                        <div style="margin-bottom: 12px;">
+                            <div style="font-size: 11px; color: #888; margin-bottom: 6px;">OI CONCENTRATION ANALYSIS:</div>
+                            <div style="font-size: 11px; color: #ddd;">{{trade.smart_money_insights.oi_concentration_zones.concentration_analysis}}</div>
+                            {% if trade.smart_money_insights.oi_concentration_zones.heavy_call_strikes %}
+                            <div style="margin-top: 8px;">
+                                <span style="font-size: 10px; color: #00ff88; font-weight: 500;">Heavy Call Strikes:</span>
+                                {% for strike in trade.smart_money_insights.oi_concentration_zones.heavy_call_strikes %}
+                                <span style="background: #004422; padding: 2px 6px; border-radius: 3px; margin-left: 4px; font-size: 10px;">{{strike.strike}} ({{strike.oi}})</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% if trade.smart_money_insights.oi_concentration_zones.heavy_put_strikes %}
+                            <div style="margin-top: 8px;">
+                                <span style="font-size: 10px; color: #ff4444; font-weight: 500;">Heavy Put Strikes:</span>
+                                {% for strike in trade.smart_money_insights.oi_concentration_zones.heavy_put_strikes %}
+                                <span style="background: #442222; padding: 2px 6px; border-radius: 3px; margin-left: 4px; font-size: 10px;">{{strike.strike}} ({{strike.oi}})</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        {% if trade.smart_money_insights.flow_analysis %}
+                        <div style="margin-bottom: 12px;">
+                            <div style="font-size: 11px; color: #888; margin-bottom: 6px;">FLOW ANALYSIS:</div>
+                            <div style="font-size: 11px; color: #ddd;">{{trade.smart_money_insights.flow_analysis.net_positioning}}</div>
+                            {% if trade.smart_money_insights.flow_analysis.large_blocks %}
+                            <div style="margin-top: 4px;">
+                                {% for block in trade.smart_money_insights.flow_analysis.large_blocks %}
+                                <div style="font-size: 10px; color: #ccc;">• {{block}}</div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        {% if trade.smart_money_insights.put_call_dynamics %}
+                        <div style="margin-bottom: 12px;">
+                            <div style="font-size: 11px; color: #888; margin-bottom: 6px;">PUT/CALL DYNAMICS:</div>
+                            <div style="font-size: 11px; color: #ddd;">
+                                <span style="color: #ffaa00;">Ratio: {{trade.smart_money_insights.put_call_dynamics.ratio}}</span>
+                                <span style="margin-left: 15px; color: #00ff88;">Change: {{trade.smart_money_insights.put_call_dynamics.change}}</span>
+                            </div>
+                            <div style="font-size: 10px; color: #ccc; margin-top: 4px;">{{trade.smart_money_insights.put_call_dynamics.smart_money_view}}</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if trade.smart_money_insights.max_pain_analysis %}
+                        <div style="margin-bottom: 12px;">
+                            <div style="font-size: 11px; color: #888; margin-bottom: 6px;">MAX PAIN ANALYSIS:</div>
+                            <div style="font-size: 11px; color: #ddd;">
+                                <span style="color: #ffaa00;">Level: ${{trade.smart_money_insights.max_pain_analysis.level}}</span>
+                                <span style="margin-left: 15px; color: #ff4444;">Pin Risk: {{trade.smart_money_insights.max_pain_analysis.pin_risk}}</span>
+                            </div>
+                            <div style="font-size: 10px; color: #ccc; margin-top: 4px;">{{trade.smart_money_insights.max_pain_analysis.dealer_impact}}</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if trade.smart_money_insights.gamma_analysis %}
+                        <div style="margin-bottom: 8px;">
+                            <div style="font-size: 11px; color: #888; margin-bottom: 6px;">GAMMA EXPOSURE:</div>
+                            <div style="font-size: 11px; color: #ddd;">
+                                <span style="color: #00ff88;">{{trade.smart_money_insights.gamma_analysis.net_exposure}}</span>
+                                <span style="margin-left: 15px; color: #ffaa00;">Squeeze Risk: {{trade.smart_money_insights.gamma_analysis.squeeze_risk}}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
         </div>
         
-        <div class="risk-section">
-            <div class="section-title">⚡ Portfolio Risk Monitor</div>
-            <div class="risk-grid">
-                <div class="risk-card">
-                    <div class="risk-metric">Value at Risk (95%)</div>
-                    <div class="risk-value negative">{{risk_metrics.portfolio_var}}</div>
-                </div>
-                <div class="risk-card">
-                    <div class="risk-metric">Delta Exposure</div>
-                    <div class="risk-value positive">{{risk_metrics.delta_exposure}}</div>
-                </div>
-                <div class="risk-card">
-                    <div class="risk-metric">Theta Decay (Daily)</div>
-                    <div class="risk-value negative">{{risk_metrics.theta_decay}}</div>
-                </div>
-                <div class="risk-card">
-                    <div class="risk-metric">Max Position Risk</div>
-                    <div class="risk-value">{{risk_metrics.max_position_risk}}</div>
-                </div>
-            </div>
-        </div>
+
         
         <div class="recommendations-section">
             <div class="section-title">📋 Complete Trade Recommendations</div>

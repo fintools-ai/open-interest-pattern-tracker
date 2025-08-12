@@ -15,12 +15,18 @@ class DeltaCalculator:
             return self._create_baseline_delta(current_data, ticker)
         
         # Get the latest date data from current
-        current_date_key = max(current_data.get("data_by_date", {}).keys())
-        current_oi = current_data["data_by_date"][current_date_key]
+        data_by_date = current_data.get("data_by_date", {})
+        if not data_by_date:
+            return {"ticker": ticker, "error": "No current data available"}
+        current_date_key = max(data_by_date.keys())
+        current_oi = data_by_date[current_date_key]
         
         # Get the latest date data from previous
-        previous_date_key = max(previous_data.get("data_by_date", {}).keys())
-        previous_oi = previous_data["data_by_date"][previous_date_key]
+        previous_dates = previous_data.get("data_by_date", {})
+        if not previous_dates:
+            return {"ticker": ticker, "error": "No previous data available"}
+        previous_date_key = max(previous_dates.keys())
+        previous_oi = previous_dates[previous_date_key]
         
         delta_data = {
             "ticker": ticker,
@@ -94,8 +100,11 @@ class DeltaCalculator:
     
     def _create_baseline_delta(self, current_data, ticker):
         """Create baseline delta when no previous data exists"""
-        current_date_key = max(current_data.get("data_by_date", {}).keys())
-        current_oi = current_data["data_by_date"][current_date_key]
+        data_by_date = current_data.get("data_by_date", {})
+        if not data_by_date:
+            return {"ticker": ticker, "error": "No data available"}
+        current_date_key = max(data_by_date.keys())
+        current_oi = data_by_date[current_date_key]
         
         return {
             "ticker": ticker,

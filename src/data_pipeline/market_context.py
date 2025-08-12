@@ -6,22 +6,31 @@ import asyncio
 import json
 import subprocess
 from datetime import datetime
-from config.settings import MCP_EXECUTABLE
+from config.settings import MCP_OI_EXECUTABLE, OI_ANALYSIS_DAYS
 
 class MarketContextProvider:
     def __init__(self):
-        self.mcp_executable = MCP_EXECUTABLE
+        self.mcp_executable = MCP_OI_EXECUTABLE
         self.vix_ticker = "VIX"
     
     async def get_market_context(self):
         """Get market context using VIX open interest data"""
         try:
             vix_data = await self._get_vix_oi_data()
+            #print(json.dumps(vix_data, indent=2))
+            #print("===")
+            #print(f"VIX data received: {json.dumps(vix_data, indent=2) if vix_data else 'None'}")
             
             if not vix_data:
                 return None
             
             context = self._analyze_vix_context(vix_data)
+            if not context:
+                return None
+            
+            print(json.dumps(context, indent=2))
+            print("===")
+                
             context["timestamp"] = datetime.now().isoformat()
             
             return context
@@ -31,56 +40,50 @@ class MarketContextProvider:
             return None
     
     async def _get_vix_oi_data(self):
-        """Get VIX open interest data via MCP service"""
+        """Get VIX open interest data via MCP service using working client"""
+        from data_pipeline.collector import MCPOIClient
+        
         try:
-            mcp_input = {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "tools/call",
-                "params": {
-                    "name": "analyze_open_interest",
-                    "arguments": {
-                        "ticker": self.vix_ticker,
-                        "days": 5,
-                        "include_news": False
-                    }
-                }
-            }
-            
-            process = await asyncio.create_subprocess_exec(
-                self.mcp_executable,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            stdout, stderr = await process.communicate(
-                input=json.dumps(mcp_input).encode()
-            )
-            
-            if process.returncode != 0:
-                raise Exception(f"VIX MCP call failed: {stderr.decode()}")
-            
-            response = json.loads(stdout.decode())
-            
-            if "error" in response:
-                raise Exception(f"VIX MCP error: {response['error']}")
-            
-            result_content = response["result"]["content"][0]["text"]
-            return json.loads(result_content)
+            client = MCPOIClient()
+            try:
+                await client.start()
+                result = await client.call_tool("analyze_open_interest", {
+                    "ticker": self.vix_ticker,
+                    "days": OI_ANALYSIS_DAYS,
+                    "include_news": True
+                })
+                return result
+            finally:
+                await client.stop()
             
         except Exception as e:
             raise Exception(f"VIX data collection failed: {str(e)}")
     
     def _analyze_vix_context(self, vix_data):
         """Analyze VIX OI data to determine market context"""
-        latest_date = max(vix_data.get("data_by_date", {}).keys())
-        vix_oi = vix_data["data_by_date"][latest_date]
+        data_by_date = vix_data.get("data_by_date", {})
+        if not data_by_date:
+            return {
+                "source": "VIX_OI_Analysis",
+                "regime": "unknown",
+                "vix_put_call_ratio": 0,
+                "vix_total_oi": 0,
+                "vix_call_oi": 0,
+                "vix_put_oi": 0,
+                "fear_level": "unknown",
+                "volatility_expectation": "unknown",
+                "market_summary": "No VIX data available for analysis"
+            }
         
-        vix_put_call_ratio = vix_oi.get("put_call_ratio", 0)
-        vix_total_oi = vix_oi.get("total_oi", 0)
-        vix_call_oi = vix_oi.get("call_oi", 0)
-        vix_put_oi = vix_oi.get("put_oi", 0)
+        latest_date = max(data_by_date.keys())
+        vix_oi = data_by_date[latest_date]
+        
+        # Extract from summary_metrics
+        summary = vix_oi.get("summary_metrics", {})
+        vix_put_call_ratio = summary.get("put_call_ratio", 0)
+        vix_total_oi = summary.get("total_open_interest", 0)
+        vix_call_oi = summary.get("call_open_interest", 0)
+        vix_put_oi = summary.get("put_open_interest", 0)
         
         regime = self._determine_market_regime(vix_put_call_ratio)
         fear_level = self._calculate_fear_level(vix_put_call_ratio, vix_call_oi, vix_put_oi)

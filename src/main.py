@@ -14,6 +14,7 @@ from data_pipeline.market_context import MarketContextProvider
 from analysis.llm_analyzer import LLMAnalyzer
 from analysis.clustering_engine import ClusteringEngine
 from output.html_generator import HTMLGenerator
+import json
 
 class OIPatternTracker:
     def __init__(self):
@@ -38,11 +39,9 @@ class OIPatternTracker:
             print("\nPhase 1: Data Collection")
             collection_results = await self.collector.collect_all_tickers()
             
-            if collection_results["success_rate"] < 0.5:
-                print(f"Warning: Low success rate ({collection_results['success_rate']:.1%})")
-            
-            successful_data = collection_results["successful"]
-            print(f"Collected data for {len(successful_data)} tickers")
+            ticker_data = collection_results["data"]
+            summary = collection_results["summary"]
+            print(f"Collected data for {summary['successful']}/{summary['total_processed']} tickers")
             
             # Phase 2: Market Context
             print("\nPhase 2: Market Context Analysis")
@@ -56,13 +55,10 @@ class OIPatternTracker:
             print("\nPhase 3: Delta Calculation & Redis Storage")
             today = datetime.now().strftime('%Y-%m-%d')
             
-            for ticker_result in successful_data:
-                ticker = ticker_result["ticker"]
-                combined_data = ticker_result["data"]
-                
-                # Extract OI data and market data from combined result
-                oi_data = combined_data.get("oi_data") if combined_data.get("oi_status") == "success" else None
-                market_data = combined_data.get("market_data") if combined_data.get("market_data_status") == "success" else None
+            processed_tickers = []
+            for ticker, data in ticker_data.items():
+                oi_data = data.get("oi_data")
+                market_data = data.get("market_data")
                 
                 if oi_data:
                     # Store current OI data in Redis
@@ -70,41 +66,75 @@ class OIPatternTracker:
                     
                     # Calculate deltas
                     previous_data = self.redis_manager.get_previous_oi_data(ticker, days_back=1)
+                    print(f"  {ticker}: Previous data available: {'Yes' if previous_data else 'No'}")
+                    
                     delta_data = self.delta_calculator.calculate_deltas(oi_data, previous_data, ticker)
+                    
+                    # Log delta calculation results
+                    if delta_data.get("is_baseline"):
+                        print(f"  {ticker}: Delta baseline created (first run)")
+                    elif delta_data.get("error"):
+                        print(f"  {ticker}: Delta calculation error: {delta_data['error']}")
+                    else:
+                        # Log key delta metrics
+                        pcr_delta = delta_data.get("put_call_ratio_delta", 0)
+                        max_pain_shift = delta_data.get("max_pain_shift", 0)
+                        total_oi_change = delta_data.get("total_oi_change", 0)
+                        print(f"  {ticker}: P/C Δ: {pcr_delta:.3f}, Max Pain Δ: ${max_pain_shift:.2f}, OI Δ: {total_oi_change}")
                     
                     # Store delta data
                     self.redis_manager.store_delta_data(ticker, today, delta_data)
                     
-                    # Add delta to ticker result for LLM analysis
-                    ticker_result["delta"] = delta_data
-                    ticker_result["oi_data"] = oi_data
+                    # Create ticker result for analysis
+                    processed_tickers.append({
+                        "ticker": ticker,
+                        "oi_data": oi_data,
+                        "delta": delta_data,
+                        "market_data": market_data
+                    })
                 else:
                     print(f"  Warning: No OI data for {ticker}")
-                    ticker_result["delta"] = {}
-                    ticker_result["oi_data"] = {}
-                
-                # Add market data to ticker result
-                ticker_result["market_data"] = market_data
+                    # Create empty delta with proper structure for LLM
+                    empty_delta = {
+                        "ticker": ticker,
+                        "message": "No OI data available for delta calculation",
+                        "is_baseline": True,
+                        "put_call_ratio_delta": 0,
+                        "max_pain_shift": 0,
+                        "total_oi_change": 0,
+                        "call_oi_change": 0,
+                        "put_oi_change": 0
+                    }
+                    processed_tickers.append({
+                        "ticker": ticker,
+                        "oi_data": {},
+                        "delta": empty_delta,
+                        "market_data": market_data
+                    })
             
-            print(f"Calculated deltas and stored data for {len(successful_data)} tickers")
+            print(f"Calculated deltas and stored data for {len(processed_tickers)} tickers")
             
             # Phase 4: LLM Analysis
             print("\nPhase 4: Enhanced LLM Analysis with Price Context")
             analyses = []
             
             # Process all tickers with enhanced price data
-            for ticker_result in successful_data:
+
+
+            for ticker_result in processed_tickers:
                 ticker = ticker_result["ticker"]
                 print(f"  Analyzing {ticker}...")
                 
                 # Only analyze if we have OI data
                 if ticker_result.get("oi_data"):
-                    analysis = await self.llm_analyzer.analyze_ticker(
+                    print(f"    OI data keys: {list(ticker_result['oi_data'].keys())}")
+                    analysis = self.llm_analyzer.analyze_ticker(
                         ticker_result["oi_data"],
                         ticker_result["delta"],
                         market_context,
                         ticker_result.get("market_data")  # Pass market data with prices
                     )
+                    print(f"    Analysis result: {(analysis)}")
                     
                     # Log if we have price enhancement
                     if ticker_result.get("market_data") and ticker_result["market_data"].get("current_price"):
@@ -117,24 +147,29 @@ class OIPatternTracker:
                     }
                 
                 analyses.append(analysis)
+                print(f"    Analysis status: {analysis.get('status', 'unknown')}")
+                if analysis.get('status') == 'error':
+                    print(f"    Error: {analysis.get('error', 'unknown')}")
                 
                 # Store analysis result
                 self.redis_manager.store_analysis_result(ticker, today, analysis)
             
             print(f"Completed LLM analysis for {len(analyses)} tickers")
             
+            print("--------")
+            print(json.dumps(analyses, indent=2))
+            print("--------")
             # Phase 5: Clustering
             print("\nPhase 5: Pattern Clustering")
             clusters = self.clustering_engine.cluster_analyses(analyses)
             
             bullish_count = clusters["bullish_group"]["total_count"]
             bearish_count = clusters["bearish_group"]["total_count"]
-            neutral_count = clusters["neutral_group"]["total_count"]
             
             print(f"Clustering complete:")
             print(f"   Bullish signals: {bullish_count}")
             print(f"   Bearish signals: {bearish_count}")
-            print(f"   Neutral/filtered: {neutral_count}")
+            print(f"   Total signals: {bullish_count + bearish_count}")
             
             if bullish_count + bearish_count > 0:
                 avg_success_rate = (
@@ -163,7 +198,7 @@ class OIPatternTracker:
             print(f"\nDaily analysis complete!")
             print(f"Total processing time: {duration}")
             print(f"Analysis summary:")
-            print(f"   • {len(successful_data)} tickers processed")
+            print(f"   • {len(processed_tickers)} tickers processed")
             print(f"   • {bullish_count + bearish_count} trading signals generated")
             print(f"   • Market bias: {clusters['summary']['market_bias']}")
             
@@ -172,7 +207,7 @@ class OIPatternTracker:
             
             return {
                 "status": "success",
-                "processed_tickers": len(successful_data),
+                "processed_tickers": len(processed_tickers),
                 "bullish_signals": bullish_count,
                 "bearish_signals": bearish_count,
                 "dashboard_path": dashboard_path,
