@@ -70,13 +70,13 @@ def analyze_query():
         if not session_id or not user_query:
             return jsonify({"error": "Session ID and query are required"}), 400
         
-        # Process query asynchronously
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(
-            interactive_service.analyze_query(session_id, user_query)
-        )
-        loop.close()
+        # Process query - no async needed anymore
+        response_text, tool_calls = interactive_service.process_query(session_id, user_query)
+        
+        result = {
+            "response": response_text,
+            "tools_used": [call["name"] for call in tool_calls]
+        }
         
         return jsonify(result)
         
@@ -96,7 +96,7 @@ def get_session_info():
             "ticker": session["ticker"],
             "created_at": session["created_at"],
             "conversation_history": session["conversation_history"],
-            "tools_available": session["tools_available"]
+            "tools_available": ["get_live_oi_data", "get_market_data"]
         })
         
     except Exception as e:
@@ -195,11 +195,9 @@ def analysis_interface(session_id):
                 <div class="chat-title">Interactive Analysis Session</div>
                 <div class="tools-available">
                     <strong>Available Tools:</strong>
-                    <span class="tool-tag">Extended OI Forecast</span>
-                    <span class="tool-tag">Historical Patterns</span>
-                    <span class="tool-tag">Risk Scenarios</span>
-                    <span class="tool-tag">Gamma Analysis</span>
-                    <span class="tool-tag">Institutional Flow</span>
+                    <span class="tool-tag">Live OI Data</span>
+                    <span class="tool-tag">Market Data</span>
+                    <span class="tool-tag">Custom DTE Analysis</span>
                 </div>
             </div>
             
@@ -213,11 +211,11 @@ def analysis_interface(session_id):
                             You can ask me anything about this setup:<br><br>
                             
                             <div class="suggestions">
-                                <div class="suggestion" onclick="sendSuggestion('Get open interest forecast for next 30 days')">📊 30-day OI forecast</div>
-                                <div class="suggestion" onclick="sendSuggestion('Show me similar historical setups')">📈 Historical patterns</div>
-                                <div class="suggestion" onclick="sendSuggestion('What are the risk scenarios if VIX spikes?')">⚠️ Risk analysis</div>
-                                <div class="suggestion" onclick="sendSuggestion('Analyze gamma squeeze potential')">⚡ Gamma analysis</div>
-                                <div class="suggestion" onclick="sendSuggestion('Track institutional money flow')">🏦 Smart money flow</div>
+                                <div class="suggestion" onclick="sendSuggestion('Get fresh OI data for this ticker')">📊 Fresh OI Data</div>
+                                <div class="suggestion" onclick="sendSuggestion('Show me OI data for 45 DTE options')">📈 Custom DTE Analysis</div>
+                                <div class="suggestion" onclick="sendSuggestion('Get current market data and technicals')">⚡ Market Data</div>
+                                <div class="suggestion" onclick="sendSuggestion('What does the current OI pattern tell us?')">🔍 Pattern Analysis</div>
+                                <div class="suggestion" onclick="sendSuggestion('What are the key risks for this trade?')">⚠️ Risk Assessment</div>
                             </div>
                             
                             What would you like to explore first?
