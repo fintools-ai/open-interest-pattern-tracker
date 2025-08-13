@@ -215,50 +215,26 @@ Focus on practical trading insights that help make profitable decisions using LI
         response_body = json.loads(response['body'].read())
         content = response_body['content']
         
-        # Handle tool calls
+        # Handle response - simplified to avoid tool_use validation errors
         final_response = ""
         
         for item in content:
             if item['type'] == 'text':
                 final_response += item['text']
             elif item['type'] == 'tool_use':
-                # Execute the tool call
-                tool_result = await self._execute_tool_call(item)
+                # For now, just acknowledge tool use without complex flow
+                tool_name = item.get('name', 'unknown_tool')
+                final_response += f"\n\n[Tool called: {tool_name}]\n"
                 
-                # Continue conversation with tool result
-                follow_up_body = {
-                    "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 3000,
-                    "tools": tools,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": prompt
-                        },
-                        {
-                            "role": "assistant",
-                            "content": content
-                        },
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "tool_result",
-                                    "tool_use_id": item['id'],
-                                    "content": json.dumps(tool_result)
-                                }
-                            ]
-                        }
-                    ]
-                }
-                
-                follow_up_response = self.bedrock_client.invoke_model(
-                    modelId=self.model_id,
-                    body=json.dumps(follow_up_body)
-                )
-                
-                follow_up_body = json.loads(follow_up_response['body'].read())
-                final_response += follow_up_body['content'][0]['text']
+                # Execute the tool call and include result
+                try:
+                    tool_result = await self._execute_tool_call(item)
+                    if 'error' not in tool_result:
+                        final_response += f"Tool result: {json.dumps(tool_result, indent=2)}\n"
+                    else:
+                        final_response += f"Tool error: {tool_result['error']}\n"
+                except Exception as e:
+                    final_response += f"Tool execution failed: {str(e)}\n"
         
         return final_response
     
