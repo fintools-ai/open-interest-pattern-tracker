@@ -453,7 +453,6 @@ class HTMLGenerator:
         .trade-card.bullish { border-left: 4px solid #00ff88; }
         .trade-card.bearish { border-left: 4px solid #ff4444; }
         .trade-card.bearish:hover { border-color: #ff4444; box-shadow: 0 5px 20px rgba(255, 68, 68, 0.2); }
-        .interactive-badge { position: absolute; top: 10px; right: 10px; background: rgba(0, 255, 136, 0.2); color: #00ff88; padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; border: 1px solid #00ff88; }
         .click-hint { position: absolute; bottom: 10px; right: 15px; color: #666; font-size: 11px; opacity: 0; transition: opacity 0.3s ease; }
         .trade-card:hover .click-hint { opacity: 1; }
 
@@ -658,8 +657,7 @@ class HTMLGenerator:
             <div class="section-title">🎯 High Conviction Trades</div>
             <div class="trade-cards">
                 {% for trade in high_conviction_trades %}
-                <div class="trade-card {{trade.direction}}" onclick="openDeepAnalysis('{{trade.ticker}}', '{{trade.direction}}')">
-                    <div class="interactive-badge">🔍 DEEP ANALYSIS</div>
+                <div class="trade-card {{trade.direction}}" onclick="openInteractiveAnalysis('{{trade.ticker}}', '{{trade.direction}}')">
                     <div class="click-hint">Click for interactive session</div>
                     <div class="trade-header">
                         <div class="ticker">{{trade.ticker}} <span style="font-size: 16px; color: #888; font-weight: 400;">${{trade.current_price}}</span></div>
@@ -857,7 +855,7 @@ class HTMLGenerator:
     </div>
     
     <script>
-        function openDeepAnalysis(ticker, direction) {
+        function openInteractiveAnalysis(ticker, direction) {
             // Show loading indicator
             const card = event.currentTarget;
             const originalContent = card.innerHTML;
@@ -903,18 +901,6 @@ class HTMLGenerator:
             .then(response => {
                 if (response.ok) {
                     console.log('✅ Interactive Analysis Service is running');
-                    // Add visual indicator that deep analysis is available
-                    const badge = document.createElement('div');
-                    badge.style.cssText = 'position: fixed; top: 20px; right: 20px; background: rgba(0, 255, 136, 0.9); color: #000; padding: 8px 15px; border-radius: 20px; font-size: 12px; font-weight: 600; z-index: 1000; box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);';
-                    badge.textContent = '🔍 Deep Analysis Available';
-                    document.body.appendChild(badge);
-                    
-                    // Auto-hide after 5 seconds
-                    setTimeout(() => {
-                        badge.style.opacity = '0';
-                        badge.style.transition = 'opacity 0.5s ease';
-                        setTimeout(() => badge.remove(), 500);
-                    }, 5000);
                 }
             })
             .catch(error => {

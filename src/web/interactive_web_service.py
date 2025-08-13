@@ -126,7 +126,7 @@ def analysis_interface(session_id):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deep Analysis: {{ ticker }}</title>
+    <title>Interactive Analysis: {{ ticker }}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a0a0a; color: #fff; }
@@ -169,7 +169,7 @@ def analysis_interface(session_id):
 <body>
     <div class="analysis-container">
         <div class="session-header">
-            <div class="session-title">🔍 Deep Analysis: {{ ticker }}</div>
+            <div class="session-title">🤖 Interactive Analysis: {{ ticker }}</div>
             <div class="session-info">
                 <div class="info-card">
                     <div class="info-label">Pattern Type</div>
@@ -228,7 +228,7 @@ def analysis_interface(session_id):
             
             <div class="chat-input-container">
                 <div class="input-row">
-                    <input type="text" id="query-input" class="query-input" placeholder="Ask about OI patterns, risk scenarios, or request deep analysis..." />
+                    <input type="text" id="query-input" class="query-input" placeholder="Ask about OI patterns, risk scenarios, or request analysis..." />
                     <button id="send-btn" class="send-btn" onclick="sendQuery()">Analyze</button>
                 </div>
             </div>
@@ -333,7 +333,7 @@ def index():
     """Simple index page"""
     return """
     <h1>OI Pattern Tracker - Interactive Analysis Service</h1>
-    <p>Deep analysis sessions for options trading insights</p>
+    <p>Interactive analysis sessions for options trading insights</p>
     <p>Use the main dashboard to create analysis sessions.</p>
     """
 
