@@ -1,6 +1,105 @@
 """
 Main Orchestrator - Daily OI Pattern Analysis Workflow
 Coordinates all components to generate trading signals and dashboards
+
+=== DETAILED DATA FLOW DOCUMENTATION ===
+
+COMPLETE SYSTEM FLOW:
+1. Data Collection (MCP Services) → Raw OI + Market Data
+2. Delta Calculation → Day-over-day OI changes 
+3. Redis Storage → Persistent data with 7-day expiry
+4. LLM Analysis → Smart money intelligence extraction
+5. Clustering → Bullish/Bearish signal grouping
+6. HTML Generation → Trading dashboard output
+
+PHASE-BY-PHASE DATA FLOW:
+
+PHASE 1: DATA COLLECTION
+├── EnhancedOIDataCollector.collect_all_tickers()
+├── For each ticker in TICKERS:
+│   ├── MCP OI Service → analyze_open_interest() → Raw OI data
+│   ├── MCP Market Data Service → financial_technical_analysis_tool() → Price data
+│   └── Result: {ticker: {oi_data: {...}, market_data: {...}}}
+└── Output: collection_results["data"] = ticker_data dict
+
+PHASE 2: MARKET CONTEXT
+├── MarketContextProvider.get_market_context()
+├── Fetch VIX OI data via MCP OI Service
+├── Analyze VIX P/C ratio → Market regime (bullish/bearish/sideways)
+└── Output: market_context = {regime, fear_level, vix_metrics}
+
+PHASE 3: DELTA CALCULATION & STORAGE
+├── For each ticker with oi_data:
+│   ├── Store current OI: Redis["{ticker}:{today}"] = oi_data
+│   ├── Retrieve previous: Redis["{ticker}:{yesterday}"] → previous_data
+│   ├── Calculate deltas: DeltaCalculator.calculate_deltas()
+│   │   ├── If no previous_data → Create baseline with is_baseline=True
+│   │   ├── Else → Calculate comprehensive deltas:
+│   │   │   ├── put_call_ratio_delta = current_pcr - previous_pcr
+│   │   │   ├── max_pain_shift = current_max_pain - previous_max_pain
+│   │   │   ├── total_oi_change = current_total_oi - previous_total_oi
+│   │   │   ├── strike_level_changes = per-strike OI analysis
+│   │   │   ├── large_oi_increases = blocks >5000 contracts
+│   │   │   └── unusual_activity = smart money flags
+│   │   └── Store deltas: Redis["delta:{ticker}:{today}"] = delta_data
+│   └── Build processed_tickers list with {ticker, oi_data, delta, market_data}
+└── Output: processed_tickers[] with complete data packages
+
+PHASE 4: LLM ANALYSIS  
+├── For each ticker in processed_tickers:
+│   ├── EXACT DATA SENT TO LLM:
+│   │   ├── ticker_result["oi_data"] → Raw OI from MCP (strikes, volumes, etc.)
+│   │   ├── ticker_result["delta"] → SAME delta_data calculated & stored in Phase 3
+│   │   ├── market_context → VIX analysis from Phase 2
+│   │   └── ticker_result["market_data"] → Technical analysis from MCP
+│   ├── LLMAnalyzer.analyze_ticker() builds prompt with:
+│   │   ├── ## Open Interest Data: {json.dumps(oi_data)}
+│   │   ├── ## Delta Changes: {json.dumps(delta_data)}  ← CRITICAL: Same object as stored
+│   │   ├── ## Market Context: {json.dumps(market_context)}
+│   │   └── ## Technical Analysis: {json.dumps(market_data)}
+│   ├── AWS Bedrock Claude processes → Enhanced JSON analysis
+│   ├── Parse & validate → Extract trade recommendations
+│   └── Store analysis: Redis["analysis:{ticker}:{today}"] = analysis_result
+└── Output: analyses[] with LLM recommendations
+
+PHASE 5: CLUSTERING
+├── ClusteringEngine.cluster_analyses(analyses)
+├── Classify each analysis as bullish/bearish based on direction
+├── Group by sentiment and calculate statistics
+├── Extract smart_money_insights for each trade
+└── Output: clusters with {bullish_group, bearish_group, summary}
+
+PHASE 6: OUTPUT GENERATION
+├── HTMLGenerator.generate_daily_dashboard(clusters, market_context)
+├── Build high conviction trades with smart money insights
+├── Render Jinja2 template with comprehensive OI intelligence
+├── Generate JSON reports for programmatic access
+└── Output: HTML dashboard + JSON files
+
+=== CRITICAL DATA VALIDATION POINTS ===
+
+STORAGE → RETRIEVAL VERIFICATION:
+✓ delta_data calculated = delta_data stored = delta_data sent to LLM
+✓ No transformations between calculate_deltas() and LLM prompt
+✓ Redis serialization: JSON → store → retrieve → JSON (identical)
+
+DELTA CALCULATION STATES:
+1. First Run: is_baseline=True, no deltas, current metrics only
+2. Normal Run: Full delta calculations with previous day comparison  
+3. Error State: Error message with ticker context
+4. No OI Data: Structured empty delta for LLM processing
+
+LLM PROMPT DATA SOURCES:
+- Open Interest Data: Direct from MCP OI service (unchanged)
+- Delta Changes: Calculated day-over-day diffs (stored in Redis)
+- Market Context: VIX analysis (live calculated)
+- Technical Analysis: Direct from MCP Market Data service (unchanged)
+
+REDIS STORAGE KEYS:
+- OI Data: "{ticker}:{YYYY-MM-DD}" → Raw MCP OI data
+- Delta Data: "delta:{ticker}:{YYYY-MM-DD}" → Calculated delta metrics
+- Analysis: "analysis:{ticker}:{YYYY-MM-DD}" → LLM analysis results
+- Expiry: 7 days for all stored data
 """
 
 import asyncio

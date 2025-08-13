@@ -113,6 +113,7 @@ class HTMLGenerator:
         high_conviction_trades = self._get_high_conviction_trades(clusters, max_count=3)
         all_recommendations = self._get_all_recommendations(clusters)
         market_pulse = self._prepare_market_pulse(clusters, market_context)
+        gamma_squeeze_data = self._prepare_gamma_squeeze_data(clusters)
         
         template_data = {
             # Header stats
@@ -124,6 +125,9 @@ class HTMLGenerator:
             
             # Market pulse data
             "market_pulse": market_pulse,
+            
+            # Gamma squeeze analysis data
+            "gamma_squeeze_data": gamma_squeeze_data,
             
             # ALL trades for featured cards
             "high_conviction_trades": high_conviction_trades,
@@ -140,6 +144,85 @@ class HTMLGenerator:
         }
         
         return template_data
+    
+    def _prepare_gamma_squeeze_data(self, clusters):
+        """Prepare gamma squeeze analysis data for dashboard"""
+        gamma_setups = []
+        
+        # Process all tickers from both bullish and bearish clusters
+        all_tickers = clusters["bullish_group"]["tickers"] + clusters["bearish_group"]["tickers"]
+        
+        for ticker in all_tickers:
+            smart_money = ticker.get("smart_money_insights", {})
+            gamma_analysis = smart_money.get("gamma_analysis", {})
+            
+            # Only include tickers with gamma analysis data
+            if gamma_analysis:
+                # Determine squeeze direction and risk level
+                squeeze_risk = gamma_analysis.get("squeeze_risk", "Unknown")
+                net_exposure = gamma_analysis.get("net_exposure", "")
+                flip_point = gamma_analysis.get("flip_point", 0)
+                current_price = float(str(ticker.get("current_price", "0")).replace("$", "").replace(",", "")) if ticker.get("current_price") else 0
+                
+                # Determine squeeze direction based on current price vs flip point
+                if current_price > flip_point:
+                    squeeze_direction = "Upward"
+                    direction_class = "bullish"
+                    direction_color = "#00ff88"
+                else:
+                    squeeze_direction = "Downward"
+                    direction_class = "bearish"
+                    direction_color = "#ff4444"
+                
+                # Calculate distance from flip point
+                flip_distance = abs(current_price - flip_point) if flip_point and current_price else 0
+                flip_distance_pct = (flip_distance / current_price * 100) if current_price > 0 else 0
+                
+                # Determine risk level styling
+                risk_color = {
+                    "High": "#ff4444",
+                    "Medium": "#ffaa00", 
+                    "Low": "#00ff88"
+                }.get(squeeze_risk, "#888888")
+                
+                gamma_setup = {
+                    "ticker": ticker["ticker"],
+                    "current_price": f"${current_price:.2f}" if current_price else ticker.get("current_price", "N/A"),
+                    "flip_point": f"${flip_point:.2f}" if flip_point else "N/A",
+                    "flip_distance": f"{flip_distance_pct:.1f}%",
+                    "squeeze_direction": squeeze_direction,
+                    "direction_class": direction_class,
+                    "direction_color": direction_color,
+                    "squeeze_risk": squeeze_risk,
+                    "risk_color": risk_color,
+                    "net_exposure": net_exposure,
+                    "volatility_impact": gamma_analysis.get("volatility_impact", "Unknown"),
+                    "pattern_type": ticker.get("pattern_type", "").replace("_", " ").title(),
+                    "confidence": f"{safe_int(ticker.get('confidence', 0))}%"
+                }
+                
+                gamma_setups.append(gamma_setup)
+        
+        # Sort by squeeze risk priority (High -> Medium -> Low) and then by confidence
+        risk_priority = {"High": 3, "Medium": 2, "Low": 1}
+        gamma_setups.sort(
+            key=lambda x: (risk_priority.get(x["squeeze_risk"], 0), safe_int(x["confidence"])),
+            reverse=True
+        )
+        
+        # Calculate summary statistics
+        total_setups = len(gamma_setups)
+        high_risk_count = len([g for g in gamma_setups if g["squeeze_risk"] == "High"])
+        upward_count = len([g for g in gamma_setups if g["squeeze_direction"] == "Upward"])
+        
+        return {
+            "gamma_setups": gamma_setups,
+            "total_setups": total_setups,
+            "high_risk_count": high_risk_count,
+            "upward_squeeze_count": upward_count,
+            "downward_squeeze_count": total_setups - upward_count,
+            "avg_flip_distance": f"{sum(float(g['flip_distance'].replace('%', '')) for g in gamma_setups) / total_setups:.1f}%" if total_setups > 0 else "0%"
+        }
     
     def _prepare_market_pulse(self, clusters, market_context):
         """Prepare market pulse section data"""
@@ -365,9 +448,14 @@ class HTMLGenerator:
         .negative { color: #ff4444; }
         .conviction-section { background: #111; border: 1px solid #333; border-radius: 12px; padding: 25px; margin-bottom: 25px; }
         .trade-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
-        .trade-card { background: #1a1a1a; border: 2px solid #333; border-radius: 10px; padding: 20px; position: relative; overflow: hidden; }
+        .trade-card { background: #1a1a1a; border: 2px solid #333; border-radius: 10px; padding: 20px; position: relative; overflow: hidden; cursor: pointer; transition: all 0.3s ease; }
+        .trade-card:hover { border-color: #00ff88; box-shadow: 0 5px 20px rgba(0, 255, 136, 0.2); transform: translateY(-2px); }
         .trade-card.bullish { border-left: 4px solid #00ff88; }
         .trade-card.bearish { border-left: 4px solid #ff4444; }
+        .trade-card.bearish:hover { border-color: #ff4444; box-shadow: 0 5px 20px rgba(255, 68, 68, 0.2); }
+        .interactive-badge { position: absolute; top: 10px; right: 10px; background: rgba(0, 255, 136, 0.2); color: #00ff88; padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; border: 1px solid #00ff88; }
+        .click-hint { position: absolute; bottom: 10px; right: 15px; color: #666; font-size: 11px; opacity: 0; transition: opacity 0.3s ease; }
+        .trade-card:hover .click-hint { opacity: 1; }
 
         .trade-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
         .ticker { font-size: 24px; font-weight: 700; color: #fff; }
@@ -399,6 +487,24 @@ class HTMLGenerator:
         .risk-card { background: #1a1a1a; padding: 20px; border-radius: 8px; text-align: center; border: 1px solid #333; }
         .risk-metric { font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 10px; }
         .risk-value { font-size: 22px; font-weight: 700; }
+        .gamma-section { background: #111; border: 1px solid #333; border-radius: 12px; padding: 25px; margin-bottom: 25px; }
+        .gamma-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px; }
+        .gamma-summary-card { background: #1a1a1a; padding: 20px; border-radius: 8px; text-align: center; border: 1px solid #333; }
+        .gamma-summary-label { font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 8px; }
+        .gamma-summary-value { font-size: 22px; font-weight: 700; color: #fff; }
+        .gamma-table { width: 100%; border-collapse: collapse; background: #1a1a1a; border-radius: 8px; overflow: hidden; }
+        .gamma-table th { background: #0a0a0a; padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 600; border-bottom: 1px solid #333; }
+        .gamma-table td { padding: 12px; border-bottom: 1px solid #222; font-size: 13px; }
+        .gamma-table tr:hover { background: #222; }
+        .squeeze-direction { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; display: inline-block; }
+        .squeeze-direction.upward { background: rgba(0, 255, 136, 0.2); color: #00ff88; border: 1px solid #00ff88; }
+        .squeeze-direction.downward { background: rgba(255, 68, 68, 0.2); color: #ff4444; border: 1px solid #ff4444; }
+        .risk-badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+        .risk-badge.high { background: #ff4444; color: #fff; }
+        .risk-badge.medium { background: #ffaa00; color: #000; }
+        .risk-badge.low { background: #00ff88; color: #000; }
+        .flip-point-indicator { display: flex; align-items: center; gap: 8px; }
+        .flip-arrow { font-size: 16px; }
         .footer { text-align: center; padding: 20px; border-top: 1px solid #333; margin-top: 40px; color: #666; font-size: 12px; }
         .last-update { color: #888; font-size: 11px; text-align: right; margin-top: 10px; }
     </style>
@@ -459,11 +565,102 @@ class HTMLGenerator:
             </div>
         </div>
         
+        <div class="gamma-section">
+            <div class="section-title">⚡ Gamma Squeeze Detection</div>
+            
+            <div class="gamma-summary">
+                <div class="gamma-summary-card">
+                    <div class="gamma-summary-label">Total Setups</div>
+                    <div class="gamma-summary-value">{{gamma_squeeze_data.total_setups}}</div>
+                </div>
+                <div class="gamma-summary-card">
+                    <div class="gamma-summary-label">High Risk</div>
+                    <div class="gamma-summary-value" style="color: #ff4444;">{{gamma_squeeze_data.high_risk_count}}</div>
+                </div>
+                <div class="gamma-summary-card">
+                    <div class="gamma-summary-label">Upward Squeeze</div>
+                    <div class="gamma-summary-value" style="color: #00ff88;">{{gamma_squeeze_data.upward_squeeze_count}}</div>
+                </div>
+                <div class="gamma-summary-card">
+                    <div class="gamma-summary-label">Avg Distance</div>
+                    <div class="gamma-summary-value" style="color: #ffaa00;">{{gamma_squeeze_data.avg_flip_distance}}</div>
+                </div>
+            </div>
+            
+            {% if gamma_squeeze_data.gamma_setups %}
+            <table class="gamma-table">
+                <thead>
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Current Price</th>
+                        <th>Gamma Flip Point</th>
+                        <th>Distance</th>
+                        <th>Squeeze Direction</th>
+                        <th>Risk Level</th>
+                        <th>Net Exposure</th>
+                        <th>Volatility Impact</th>
+                        <th>Pattern</th>
+                        <th>Confidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for setup in gamma_squeeze_data.gamma_setups %}
+                    <tr>
+                        <td class="ticker-cell">{{setup.ticker}}</td>
+                        <td>{{setup.current_price}}</td>
+                        <td>
+                            <div class="flip-point-indicator">
+                                {{setup.flip_point}}
+                                <span class="flip-arrow" style="color: {{setup.direction_color}};">
+                                    {% if setup.squeeze_direction == "Upward" %}↗{% else %}↘{% endif %}
+                                </span>
+                            </div>
+                        </td>
+                        <td>{{setup.flip_distance}}</td>
+                        <td>
+                            <span class="squeeze-direction {{setup.direction_class}}">
+                                {{setup.squeeze_direction}}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="risk-badge {{setup.squeeze_risk.lower()}}">
+                                {{setup.squeeze_risk}}
+                            </span>
+                        </td>
+                        <td style="font-size: 11px; color: #ccc;">{{setup.net_exposure}}</td>
+                        <td style="font-size: 11px; color: #ccc;">{{setup.volatility_impact}}</td>
+                        <td style="font-size: 11px; color: #888;">{{setup.pattern_type}}</td>
+                        <td style="color: {{setup.direction_color}}; font-weight: 600;">{{setup.confidence}}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="text-align: center; padding: 40px; color: #888;">
+                <div style="font-size: 18px; margin-bottom: 10px;">🔍</div>
+                <div>No gamma squeeze setups detected in current analysis</div>
+                <div style="font-size: 12px; margin-top: 8px;">Check back during high volatility periods</div>
+            </div>
+            {% endif %}
+            
+            <div style="margin-top: 20px; padding: 15px; background: #0a0a0a; border-radius: 8px; border-left: 4px solid #ffaa00;">
+                <div style="font-size: 12px; color: #ffaa00; font-weight: 600; margin-bottom: 8px;">📖 GAMMA SQUEEZE GUIDE:</div>
+                <div style="font-size: 11px; color: #ccc; line-height: 1.4;">
+                    <strong>Upward Squeeze:</strong> Price above flip point → Market makers buy stock as price rises (accelerates moves)<br>
+                    <strong>Downward Squeeze:</strong> Price below flip point → Market makers sell stock as price rises (creates resistance)<br>
+                    <strong>High Risk:</strong> Large options positioning near flip point creates volatile conditions<br>
+                    <strong>Distance:</strong> How far current price is from gamma flip point (closer = higher volatility)
+                </div>
+            </div>
+        </div>
+        
         <div class="conviction-section">
             <div class="section-title">🎯 High Conviction Trades</div>
             <div class="trade-cards">
                 {% for trade in high_conviction_trades %}
-                <div class="trade-card {{trade.direction}}">
+                <div class="trade-card {{trade.direction}}" onclick="openDeepAnalysis('{{trade.ticker}}', '{{trade.direction}}')">
+                    <div class="interactive-badge">🔍 DEEP ANALYSIS</div>
+                    <div class="click-hint">Click for interactive session</div>
                     <div class="trade-header">
                         <div class="ticker">{{trade.ticker}} <span style="font-size: 16px; color: #888; font-weight: 400;">${{trade.current_price}}</span></div>
                         <div class="confidence-badge {% if trade.direction == 'bearish' %}bearish{% endif %}">{{trade.confidence}} CONFIDENCE</div>
@@ -602,6 +799,14 @@ class HTMLGenerator:
                                 <span style="color: #00ff88;">{{trade.smart_money_insights.gamma_analysis.net_exposure}}</span>
                                 <span style="margin-left: 15px; color: #ffaa00;">Squeeze Risk: {{trade.smart_money_insights.gamma_analysis.squeeze_risk}}</span>
                             </div>
+                            {% if trade.smart_money_insights.gamma_analysis.flip_point %}
+                            <div style="margin-top: 6px; font-size: 10px; color: #ccc;">
+                                <span style="color: #888;">Gamma Flip:</span> 
+                                <span style="color: #ffaa00; font-weight: 500;">${{trade.smart_money_insights.gamma_analysis.flip_point}}</span>
+                                <span style="margin-left: 10px; color: #888;">Impact:</span>
+                                <span style="color: #ccc;">{{trade.smart_money_insights.gamma_analysis.volatility_impact}}</span>
+                            </div>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </div>
@@ -650,6 +855,73 @@ class HTMLGenerator:
             <div class="last-update">Last updated: {{last_update}} | Next analysis: 4:15 PM ET tomorrow</div>
         </div>
     </div>
+    
+    <script>
+        function openDeepAnalysis(ticker, direction) {
+            // Show loading indicator
+            const card = event.currentTarget;
+            const originalContent = card.innerHTML;
+            card.style.opacity = '0.7';
+            card.innerHTML = '<div style="text-align: center; padding: 40px;"><div style="color: #00ff88; font-size: 18px; margin-bottom: 10px;">🤖</div><div>Creating analysis session...</div></div>';
+            
+            // Create analysis session
+            fetch('http://localhost:5001/api/create-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ticker: ticker,
+                    direction: direction
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error creating session: ' + data.error);
+                    card.innerHTML = originalContent;
+                    card.style.opacity = '1';
+                } else {
+                    // Open analysis interface in new tab
+                    window.open(`http://localhost:5001/analysis/${data.session_id}`, '_blank');
+                    card.innerHTML = originalContent;
+                    card.style.opacity = '1';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error creating analysis session. Make sure the interactive service is running.');
+                card.innerHTML = originalContent;
+                card.style.opacity = '1';
+            });
+        }
+        
+        // Add startup notification
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if interactive service is running
+            fetch('http://localhost:5001/')
+            .then(response => {
+                if (response.ok) {
+                    console.log('✅ Interactive Analysis Service is running');
+                    // Add visual indicator that deep analysis is available
+                    const badge = document.createElement('div');
+                    badge.style.cssText = 'position: fixed; top: 20px; right: 20px; background: rgba(0, 255, 136, 0.9); color: #000; padding: 8px 15px; border-radius: 20px; font-size: 12px; font-weight: 600; z-index: 1000; box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);';
+                    badge.textContent = '🔍 Deep Analysis Available';
+                    document.body.appendChild(badge);
+                    
+                    // Auto-hide after 5 seconds
+                    setTimeout(() => {
+                        badge.style.opacity = '0';
+                        badge.style.transition = 'opacity 0.5s ease';
+                        setTimeout(() => badge.remove(), 500);
+                    }, 5000);
+                }
+            })
+            .catch(error => {
+                console.log('ℹ️ Interactive service not running. Start with: python src/web/interactive_web_service.py');
+            });
+        });
+    </script>
 </body>
 </html>'''
         

@@ -207,10 +207,14 @@ Return JSON with this enhanced structure that extracts MAXIMUM intelligence from
       "dealer_impact": "How dealers will hedge"
     }},
     "gamma_analysis": {{
-      "net_exposure": "Positive/Negative gamma zones",
+      "net_exposure": "Positive/Negative gamma zones with detailed explanation",
       "flip_point": 632.5,
       "squeeze_risk": "High/Medium/Low",
-      "volatility_impact": "Expected volatility behavior"
+      "volatility_impact": "Expected volatility behavior and market maker hedging impact",
+      "squeeze_direction": "Upward/Downward based on current price vs flip point", 
+      "gamma_profile": "Distribution of gamma across strikes",
+      "dealer_positioning": "How market makers will hedge and impact price action",
+      "squeeze_catalyst": "What could trigger the gamma squeeze (earnings, news, etc.)"
     }}
   }}
 }}
