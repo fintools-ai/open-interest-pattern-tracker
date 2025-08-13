@@ -70,12 +70,36 @@ def analyze_query():
         if not session_id or not user_query:
             return jsonify({"error": "Session ID and query are required"}), 400
         
-        # Process query - no async needed anymore
+        # Process query with detailed tool tracking
         response_text, tool_calls = interactive_service.process_query(session_id, user_query)
+        
+        # Extract tool execution details for UI
+        tool_details = []
+        for call in tool_calls:
+            tool_detail = {
+                "name": call["name"],
+                "parameters": call.get("parameters", {}),
+                "status": call.get("status", "unknown"),
+                "started_at": call.get("started_at"),
+                "completed_at": call.get("completed_at")
+            }
+            
+            # Calculate execution time if available
+            if call.get("started_at") and call.get("completed_at"):
+                try:
+                    start_time = datetime.fromisoformat(call["started_at"])
+                    end_time = datetime.fromisoformat(call["completed_at"])
+                    tool_detail["execution_time"] = round((end_time - start_time).total_seconds(), 2)
+                except:
+                    tool_detail["execution_time"] = "unknown"
+            
+            tool_details.append(tool_detail)
         
         result = {
             "response": response_text,
-            "tools_used": [call["name"] for call in tool_calls]
+            "tools_used": [call["name"] for call in tool_calls],
+            "tool_details": tool_details,
+            "total_tools": len(tool_calls)
         }
         
         return jsonify(result)
@@ -127,6 +151,7 @@ def analysis_interface(session_id):
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Interactive Analysis: {{ ticker }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a0a0a; color: #fff; }
@@ -161,9 +186,32 @@ def analysis_interface(session_id):
         .send-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
         
         .loading { text-align: center; color: #888; padding: 20px; }
+        .tool-status { font-size: 11px; color: #666; margin-left: 5px; }
+        .tool-success { color: #00ff88; }
+        .tool-error { color: #ff4444; }
+        .tool-pending { color: #ffaa00; }
         .suggestions { margin-bottom: 15px; }
         .suggestion { background: #333; color: #ccc; padding: 8px 12px; border-radius: 6px; display: inline-block; margin: 4px; cursor: pointer; font-size: 12px; }
         .suggestion:hover { background: #444; }
+        
+        /* Markdown styling for AI responses */
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 { color: #00ff88; margin: 16px 0 8px 0; }
+        .markdown-content h1 { font-size: 24px; border-bottom: 2px solid #333; padding-bottom: 8px; }
+        .markdown-content h2 { font-size: 20px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+        .markdown-content h3 { font-size: 16px; }
+        .markdown-content p { margin: 8px 0; line-height: 1.6; }
+        .markdown-content ul, .markdown-content ol { margin: 8px 0 8px 20px; }
+        .markdown-content li { margin: 4px 0; }
+        .markdown-content code { background: #333; padding: 2px 6px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        .markdown-content pre { background: #1a1a1a; padding: 12px; border-radius: 6px; overflow-x: auto; border-left: 4px solid #00ff88; }
+        .markdown-content pre code { background: none; padding: 0; }
+        .markdown-content blockquote { border-left: 4px solid #666; margin: 12px 0; padding: 8px 16px; background: #1a1a1a; font-style: italic; }
+        .markdown-content strong { color: #fff; font-weight: 700; }
+        .markdown-content em { color: #ccc; font-style: italic; }
+        .markdown-content table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+        .markdown-content th, .markdown-content td { border: 1px solid #333; padding: 8px 12px; text-align: left; }
+        .markdown-content th { background: #333; color: #00ff88; font-weight: 600; }
+        .markdown-content hr { border: none; height: 1px; background: #333; margin: 16px 0; }
     </style>
 </head>
 <body>
@@ -268,7 +316,7 @@ def analysis_interface(session_id):
                 if (data.error) {
                     addMessage('ai', `Error: ${data.error}`);
                 } else {
-                    addMessage('ai', data.response, data.tools_used);
+                    addMessage('ai', data.response, data.tools_used, data.tool_details);
                 }
             })
             .catch(error => {
@@ -286,17 +334,42 @@ def analysis_interface(session_id):
             sendQuery();
         }
         
-        function addMessage(type, content, tools = []) {
+        function addMessage(type, content, tools = [], toolDetails = []) {
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message';
             
             const time = new Date().toLocaleTimeString();
-            const toolInfo = tools && tools.length > 0 ? ` • Tools: ${tools.join(', ')}` : '';
+            let toolInfo = '';
+            
+            // Create detailed tool execution info
+            if (toolDetails && toolDetails.length > 0) {
+                const toolSummary = toolDetails.map(tool => {
+                    const status = tool.status === 'success' ? '✅' : tool.status === 'error' ? '❌' : '⏳';
+                    const execTime = tool.execution_time ? ` (${tool.execution_time}s)` : '';
+                    return `${status} ${tool.name}${execTime}`;
+                }).join(', ');
+                toolInfo = ` • Tools: ${toolSummary}`;
+            } else if (tools && tools.length > 0) {
+                toolInfo = ` • Tools: ${tools.join(', ')}`;
+            }
+            
+            // Render markdown for AI messages, plain text for user messages
+            let renderedContent;
+            if (type === 'ai' && window.marked) {
+                // Configure marked for better code highlighting
+                marked.setOptions({
+                    breaks: true,
+                    gfm: true
+                });
+                renderedContent = marked.parse(content);
+            } else {
+                renderedContent = content.replace(/\\n/g, '<br>');
+            }
             
             messageDiv.innerHTML = `
                 <div class="${type}-message">
                     <div class="message-time">${type === 'user' ? 'You' : 'AI Assistant'}${toolInfo} • ${time}</div>
-                    <div class="message-content">${content.replace(/\\n/g, '<br>')}</div>
+                    <div class="message-content ${type === 'ai' ? 'markdown-content' : ''}">${renderedContent}</div>
                 </div>
             `;
             

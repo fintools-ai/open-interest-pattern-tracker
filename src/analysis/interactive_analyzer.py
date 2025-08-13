@@ -13,7 +13,7 @@ import concurrent.futures
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple, Callable
 
-from config.settings import AWS_REGION, BEDROCK_MODEL_ID, MCP_MARKET_DATA_EXECUTABLE
+from config.settings import AWS_REGION, BEDROCK_MODEL_ID
 from data_pipeline.redis_manager import RedisManager
 from data_pipeline.collector import MCPOIClient
 
@@ -83,7 +83,7 @@ class InteractiveAnalysisService:
             user_query: User's question or request
             
         Returns:
-            Tuple of (response text, list of tool calls made)
+            Tuple of (response text, list of tool calls made with timing info)
         """
         context = self.get_session(session_id)
         if not context:
@@ -97,7 +97,8 @@ class InteractiveAnalysisService:
         messages = self._build_messages(user_query, current_analysis, conversation_history)
         
         # Call Bedrock with tools using Converse API
-        logger.info(f"Starting Bedrock converse call for query: {user_query[:50]}...")
+        start_time = time.time()
+        logger.info(f"🚀 Starting Bedrock converse call for query: {user_query[:50]}...")
         try:
             response_text, tool_calls = self.converse(
                 messages=messages,
@@ -105,16 +106,19 @@ class InteractiveAnalysisService:
                 tool_callback=self.execute_tool,
                 conversation_id=session_id
             )
-            logger.info(f"Bedrock converse completed. Response length: {len(response_text) if response_text else 0}")
+            total_time = time.time() - start_time
+            logger.info(f"✅ Bedrock converse completed in {total_time:.2f}s. Response length: {len(response_text) if response_text else 0}")
         except Exception as e:
-            logger.error(f"Bedrock converse failed: {e}", exc_info=True)
+            logger.error(f"❌ Bedrock converse failed: {e}", exc_info=True)
             return f"Error processing query: {str(e)}", []
         
         # Store the conversation turn
         context["conversation_history"].append({
             "user_message": user_query,
             "assistant_message": response_text,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "tool_calls": tool_calls,
+            "total_time": total_time
         })
         
         # Update session
@@ -202,12 +206,13 @@ class InteractiveAnalysisService:
                                 logger.error(f"Failed to parse tool parameters as JSON: {tool_parameters}")
                                 tool_parameters = {}
                                 
-                        logger.info(f"Collecting tool call: {tool_name} with parameters: {tool_parameters}")
+                        logger.info(f"🔧 Collecting tool call: {tool_name} with parameters: {tool_parameters}")
                         
-                        # Track this tool call
+                        # Track this tool call with timing
                         tool_calls_made.append({
                             "name": tool_name,
-                            "parameters": tool_parameters
+                            "parameters": tool_parameters,
+                            "started_at": datetime.now().isoformat()
                         })
                         
                         # Add to list of calls to execute in parallel
@@ -234,8 +239,15 @@ class InteractiveAnalysisService:
                                     if not isinstance(tool_result, str):
                                         tool_result = json.dumps(tool_result)
                                         
-                                    logger.info(f"Completed tool call: {name}")
+                                    logger.info(f"✅ Completed tool call: {name}")
                                     logger.debug(f"Tool result: {tool_result[:200]}...")
+                                    
+                                    # Update tool call info with completion
+                                    for tool_call in tool_calls_made:
+                                        if tool_call["name"] == name:
+                                            tool_call["completed_at"] = datetime.now().isoformat()
+                                            tool_call["status"] = "success"
+                                            break
                                     
                                     # Add to results
                                     tool_results.append({
@@ -245,7 +257,7 @@ class InteractiveAnalysisService:
                                         }
                                     })
                                 except Exception as exc:
-                                    logger.error(f"Tool {name} generated an exception: {exc}")
+                                    logger.error(f"❌ Tool {name} generated an exception: {exc}")
                                     # Add error result
                                     tool_results.append({
                                         "toolResult": {
@@ -253,6 +265,14 @@ class InteractiveAnalysisService:
                                             "content": [{"text": json.dumps({"error": f"Tool execution failed: {str(exc)}"})}]
                                         }
                                     })
+                                    
+                                    # Update tool call info with error
+                                    for tool_call in tool_calls_made:
+                                        if tool_call["name"] == name:
+                                            tool_call["completed_at"] = datetime.now().isoformat()
+                                            tool_call["status"] = "error"
+                                            tool_call["error"] = str(exc)
+                                            break
                                     
                         except concurrent.futures.TimeoutError:
                             # Handle timeout for remaining futures
@@ -305,20 +325,35 @@ class InteractiveAnalysisService:
             return f"I encountered an error processing your request: {str(e)}", tool_calls_made
     
     def execute_tool(self, tool_name: str, parameters: Dict[str, Any]) -> str:
-        """Execute a tool call made by the LLM"""
+        """Execute a tool call made by the LLM with detailed logging"""
+        start_time = time.time()
+        logger.info(f"🔧 Executing tool: {tool_name} with params: {parameters}")
+        
         try:
             if tool_name == "get_live_oi_data":
                 result = asyncio.run(self._tool_get_live_oi_data(**parameters))
             elif tool_name == "get_market_data":
                 result = asyncio.run(self._tool_get_market_data(**parameters))
             else:
-                return json.dumps({"error": f"Unknown tool: {tool_name}"})
-                
+                error_msg = f"Unknown tool: {tool_name}"
+                logger.error(f"❌ {error_msg}")
+                return json.dumps({"error": error_msg})
+            
+            execution_time = time.time() - start_time
+            logger.info(f"✅ Tool {tool_name} completed in {execution_time:.2f}s")
+            
+            # Add execution metadata to result
+            if isinstance(result, dict):
+                result["execution_time"] = execution_time
+                result["tool_name"] = tool_name
+            
             return json.dumps(result) if not isinstance(result, str) else result
             
         except Exception as e:
-            logger.error(f"Tool execution failed for {tool_name}: {e}")
-            return json.dumps({"error": f"Tool execution failed: {str(e)}"})
+            execution_time = time.time() - start_time
+            error_msg = f"Tool execution failed: {str(e)}"
+            logger.error(f"❌ Tool {tool_name} failed after {execution_time:.2f}s: {e}")
+            return json.dumps({"error": error_msg, "execution_time": execution_time})
     
     def _build_messages(
         self,
@@ -470,10 +505,12 @@ CRITICAL: When user asks questions, use tools to get fresh data first, then anal
             return {"error": f"Failed to get OI data for {ticker}: {str(e)}"}
     
     async def _tool_get_market_data(self, ticker: str, timeframe: str = "1d") -> Dict[str, Any]:
-        """Tool: Get market data via MCP service"""
+        """Tool: Get market data via MCP service with proper executable path"""
         try:
-            # Call the market data MCP service directly
+            # Use the correct market data executable path 
+            market_data_executable = "/Users/sayantan/Documents/Workspace/mcp_env/market_data_server/bin/mcp-market-data-server"
             
+            # Call the market data MCP service directly
             init_msg = json.dumps({
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -500,24 +537,29 @@ CRITICAL: When user asks questions, use tools to get fresh data first, then anal
                 }
             })
             
+            logger.info(f"📊 Calling market data MCP service for {ticker}")
             
             process = await asyncio.create_subprocess_exec(
-                MCP_MARKET_DATA_EXECUTABLE,
+                market_data_executable,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT
+                stderr=asyncio.subprocess.PIPE
             )
             
-            input_data = f"{init_msg}\\n{initialized_msg}\\n{tool_msg}\\n"
+            input_data = f"{init_msg}\n{initialized_msg}\n{tool_msg}\n"
             
             stdout, stderr = await process.communicate(input=input_data.encode())
             
+            if stderr:
+                logger.warning(f"Market data stderr: {stderr.decode()}")
+            
             # Parse responses
-            responses = [line for line in stdout.decode().strip().split('\\n') if line.startswith('{')]
+            responses = [line for line in stdout.decode().strip().split('\n') if line.strip().startswith('{')]
+            logger.info(f"Market data responses count: {len(responses)}")
             
             if len(responses) >= 2:
                 tool_response = json.loads(responses[-1])
-                if "error" not in tool_response:
+                if "error" not in tool_response and "result" in tool_response:
                     result_content = tool_response["result"]["content"][0]["text"]
                     market_data = json.loads(result_content)
                     
@@ -528,22 +570,30 @@ CRITICAL: When user asks questions, use tools to get fresh data first, then anal
                         "timestamp": datetime.now().isoformat()
                     }
                     
+                    logger.info(f"✅ Successfully retrieved market data for {ticker}")
                     return market_data
+                else:
+                    logger.error(f"❌ Market data tool error response: {tool_response}")
             
             # Fallback if MCP call fails
+            logger.warning(f"⚠️ Market data service call failed for {ticker}")
             return {
                 "ticker": ticker,
-                "error": "Market data service unavailable",
+                "error": "Market data service unavailable - please try again",
                 "tool_metadata": {
                     "tool": "get_market_data",
                     "ticker": ticker,
                     "timestamp": datetime.now().isoformat()
+                },
+                "debug_info": {
+                    "responses_count": len(responses),
+                    "stderr": stderr.decode() if stderr else None
                 }
             }
             
         except Exception as e:
+            logger.error(f"❌ Market data tool exception for {ticker}: {e}")
             return {"error": f"Failed to get market data for {ticker}: {str(e)}"}
-    
     def _update_session(self, session_id: str, context: Dict[str, Any]):
         """Update session in memory and Redis"""
         self.active_sessions[session_id] = context
