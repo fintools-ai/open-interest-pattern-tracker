@@ -114,6 +114,7 @@ class HTMLGenerator:
         all_recommendations = self._get_all_recommendations(clusters)
         market_pulse = self._prepare_market_pulse(clusters, market_context)
         gamma_squeeze_data = self._prepare_gamma_squeeze_data(clusters)
+        options_signals = self._prepare_options_signals(clusters)
         
         template_data = {
             # Header stats
@@ -128,6 +129,9 @@ class HTMLGenerator:
             
             # Gamma squeeze analysis data
             "gamma_squeeze_data": gamma_squeeze_data,
+            
+            # Options signals summary
+            "options_signals": options_signals,
             
             # ALL trades for featured cards
             "high_conviction_trades": high_conviction_trades,
@@ -222,6 +226,105 @@ class HTMLGenerator:
             "upward_squeeze_count": upward_count,
             "downward_squeeze_count": total_setups - upward_count,
             "avg_flip_distance": f"{sum(float(g['flip_distance'].replace('%', '')) for g in gamma_setups) / total_setups:.1f}%" if total_setups > 0 else "0%"
+        }
+    
+    def _prepare_options_signals(self, clusters):
+        """Prepare options signals summary for dashboard"""
+        bullish_calls = []
+        bearish_puts = []
+        neutral_tickers = []
+        
+        # Process all tickers from both clusters
+        all_tickers = clusters["bullish_group"]["tickers"] + clusters["bearish_group"]["tickers"]
+        
+        for ticker in all_tickers:
+            ticker_symbol = ticker["ticker"]
+            smart_money = ticker.get("smart_money_insights", {})
+            
+            # Extract put/call ratio
+            pc_dynamics = smart_money.get("put_call_dynamics", {})
+            pc_ratio = float(pc_dynamics.get("ratio", 1.0)) if pc_dynamics.get("ratio") else 1.0
+            
+            # Check for bullish call signals
+            bullish_signals = 0
+            bearish_signals = 0
+            
+            # Signal 1: Put/Call ratio analysis
+            if pc_ratio < 0.5:
+                bullish_signals += 1
+            elif pc_ratio > 1.5:
+                bearish_signals += 1
+            
+            # Signal 2: OI concentration analysis
+            oi_zones = smart_money.get("oi_concentration_zones", {})
+            heavy_calls = oi_zones.get("heavy_call_strikes", [])
+            heavy_puts = oi_zones.get("heavy_put_strikes", [])
+            
+            if len(heavy_calls) > len(heavy_puts):
+                bullish_signals += 1
+            elif len(heavy_puts) > len(heavy_calls):
+                bearish_signals += 1
+            
+            # Signal 3: Flow analysis (enhanced with new prompt structure)
+            flow_analysis = smart_money.get("flow_analysis", {})
+            net_positioning = flow_analysis.get("net_positioning", "").upper()
+            directional_bias = flow_analysis.get("directional_bias", "").upper()
+            
+            # Check for explicit flow signals from enhanced prompt
+            if "BULLISH_CALL_ACCUMULATION" in net_positioning or "CALL_HEAVY" in directional_bias:
+                bullish_signals += 1
+            elif "BEARISH_PUT_ACCUMULATION" in net_positioning or "PUT_HEAVY" in directional_bias:
+                bearish_signals += 1
+            # Fallback to previous logic for older data
+            elif "bullish" in net_positioning.lower() or "call" in net_positioning.lower():
+                bullish_signals += 1
+            elif "bearish" in net_positioning.lower() or "put" in net_positioning.lower():
+                bearish_signals += 1
+            
+            # Signal 4: Enhanced pattern type analysis
+            pattern_type = ticker.get("pattern_type", "").lower()
+            if pattern_type in ["institutional_accumulation", "gamma_squeeze_setup"] or any(word in pattern_type for word in ["accumulation", "squeeze"]):
+                bullish_signals += 1
+            elif pattern_type in ["distribution", "protective_hedging"] or any(word in pattern_type for word in ["distribution", "hedging"]):
+                bearish_signals += 1
+            
+            # Categorize ticker based on signals
+            signal_data = {
+                "ticker": ticker_symbol,
+                "pc_ratio": f"{pc_ratio:.2f}",
+                "confidence": ticker.get("confidence", "N/A"),
+                "pattern": ticker.get("pattern_type", "").replace("_", " ").title(),
+                "current_price": ticker.get("current_price", "N/A"),
+                "signals_count": max(bullish_signals, bearish_signals),
+                "signal_strength": "Strong" if max(bullish_signals, bearish_signals) >= 3 else "Moderate" if max(bullish_signals, bearish_signals) >= 2 else "Weak",
+                "directional_bias": directional_bias.replace("_", " ").title() if directional_bias else "Unknown",
+                "signal_classification": pc_dynamics.get("signal_classification", "").replace("_", " ") if pc_dynamics.get("signal_classification") else ""
+            }
+            
+            if bullish_signals >= 2 and bullish_signals > bearish_signals:
+                bullish_calls.append(signal_data)
+            elif bearish_signals >= 2 and bearish_signals > bullish_signals:
+                bearish_puts.append(signal_data)
+            else:
+                neutral_tickers.append(signal_data)
+        
+        # Sort by signal strength and confidence
+        def sort_key(x):
+            confidence = safe_int(str(x["confidence"]).replace("%", ""))
+            strength_score = {"Strong": 3, "Moderate": 2, "Weak": 1}.get(x["signal_strength"], 0)
+            return (strength_score, confidence)
+        
+        bullish_calls.sort(key=sort_key, reverse=True)
+        bearish_puts.sort(key=sort_key, reverse=True)
+        neutral_tickers.sort(key=sort_key, reverse=True)
+        
+        return {
+            "bullish_calls": bullish_calls,
+            "bearish_puts": bearish_puts,
+            "neutral_tickers": neutral_tickers,
+            "total_bullish": len(bullish_calls),
+            "total_bearish": len(bearish_puts),
+            "total_neutral": len(neutral_tickers)
         }
     
     def _prepare_market_pulse(self, clusters, market_context):
@@ -560,6 +663,130 @@ class HTMLGenerator:
                 <div class="pulse-card">
                     <div class="pulse-metric">Gamma Exposure</div>
                     <div class="pulse-value">{{market_pulse.gamma_exposure}}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="options-signals-section" style="background: #111; border: 1px solid #333; border-radius: 12px; padding: 25px; margin-bottom: 25px;">
+            <div class="section-title">📊 Options Signal Summary</div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 25px; margin-bottom: 20px;">
+                <!-- BULLISH CALLS -->
+                <div style="background: #1a1a1a; border: 2px solid #00ff88; border-radius: 10px; padding: 20px;">
+                    <div style="text-align: center; margin-bottom: 15px;">
+                        <div style="font-size: 16px; font-weight: 600; color: #00ff88; margin-bottom: 5px;">🟢 BULLISH CALLS</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #fff;">{{options_signals.total_bullish}}</div>
+                        <div style="font-size: 11px; color: #888; margin-top: 5px;">Tickers with call bias</div>
+                    </div>
+                    <div style="font-size: 11px; color: #00ff88; margin-bottom: 10px; text-transform: uppercase; font-weight: 600;">Criteria Met:</div>
+                    <div style="font-size: 10px; color: #ccc; line-height: 1.4; margin-bottom: 15px;">
+                        • Put/Call ratio < 0.5<br>
+                        • Heavy call OI concentration<br>
+                        • Bullish flow positioning<br>
+                        • Accumulation patterns
+                    </div>
+                    {% if options_signals.bullish_calls %}
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        {% for signal in options_signals.bullish_calls %}
+                        <div style="background: #0a0a0a; padding: 8px; margin-bottom: 6px; border-radius: 5px; border-left: 3px solid #00ff88;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 600; color: #fff;">{{signal.ticker}}</span>
+                                <span style="font-size: 10px; color: #00ff88;">{{signal.signal_strength}}</span>
+                            </div>
+                            <div style="font-size: 10px; color: #888; margin-top: 2px;">
+                                P/C: {{signal.pc_ratio}} | {{signal.pattern}}
+                                {% if signal.directional_bias and signal.directional_bias != "Unknown" %}
+                                <br><span style="color: #00ff88; font-size: 9px;">{{signal.directional_bias}}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div style="text-align: center; color: #666; font-size: 12px; padding: 20px;">No tickers meet bullish call criteria</div>
+                    {% endif %}
+                </div>
+                
+                <!-- BEARISH PUTS -->
+                <div style="background: #1a1a1a; border: 2px solid #ff4444; border-radius: 10px; padding: 20px;">
+                    <div style="text-align: center; margin-bottom: 15px;">
+                        <div style="font-size: 16px; font-weight: 600; color: #ff4444; margin-bottom: 5px;">🔴 BEARISH PUTS</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #fff;">{{options_signals.total_bearish}}</div>
+                        <div style="font-size: 11px; color: #888; margin-top: 5px;">Tickers with put bias</div>
+                    </div>
+                    <div style="font-size: 11px; color: #ff4444; margin-bottom: 10px; text-transform: uppercase; font-weight: 600;">Criteria Met:</div>
+                    <div style="font-size: 10px; color: #ccc; line-height: 1.4; margin-bottom: 15px;">
+                        • Put/Call ratio > 1.5<br>
+                        • Heavy put OI at key levels<br>
+                        • Bearish flow positioning<br>
+                        • Distribution patterns
+                    </div>
+                    {% if options_signals.bearish_puts %}
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        {% for signal in options_signals.bearish_puts %}
+                        <div style="background: #0a0a0a; padding: 8px; margin-bottom: 6px; border-radius: 5px; border-left: 3px solid #ff4444;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 600; color: #fff;">{{signal.ticker}}</span>
+                                <span style="font-size: 10px; color: #ff4444;">{{signal.signal_strength}}</span>
+                            </div>
+                            <div style="font-size: 10px; color: #888; margin-top: 2px;">
+                                P/C: {{signal.pc_ratio}} | {{signal.pattern}}
+                                {% if signal.directional_bias and signal.directional_bias != "Unknown" %}
+                                <br><span style="color: #ff4444; font-size: 9px;">{{signal.directional_bias}}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div style="text-align: center; color: #666; font-size: 12px; padding: 20px;">No tickers meet bearish put criteria</div>
+                    {% endif %}
+                </div>
+                
+                <!-- NEUTRAL/MIXED -->
+                <div style="background: #1a1a1a; border: 2px solid #ffaa00; border-radius: 10px; padding: 20px;">
+                    <div style="text-align: center; margin-bottom: 15px;">
+                        <div style="font-size: 16px; font-weight: 600; color: #ffaa00; margin-bottom: 5px;">⚪ NEUTRAL/MIXED</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #fff;">{{options_signals.total_neutral}}</div>
+                        <div style="font-size: 11px; color: #888; margin-top: 5px;">Inconclusive signals</div>
+                    </div>
+                    <div style="font-size: 11px; color: #ffaa00; margin-bottom: 10px; text-transform: uppercase; font-weight: 600;">Characteristics:</div>
+                    <div style="font-size: 10px; color: #ccc; line-height: 1.4; margin-bottom: 15px;">
+                        • Mixed P/C ratios (0.5-1.5)<br>
+                        • Balanced OI distribution<br>
+                        • Unclear directional bias<br>
+                        • Wait for clearer signals
+                    </div>
+                    {% if options_signals.neutral_tickers %}
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        {% for signal in options_signals.neutral_tickers %}
+                        <div style="background: #0a0a0a; padding: 8px; margin-bottom: 6px; border-radius: 5px; border-left: 3px solid #ffaa00;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 600; color: #fff;">{{signal.ticker}}</span>
+                                <span style="font-size: 10px; color: #ffaa00;">{{signal.signal_strength}}</span>
+                            </div>
+                            <div style="font-size: 10px; color: #888; margin-top: 2px;">
+                                P/C: {{signal.pc_ratio}} | {{signal.pattern}}
+                                {% if signal.directional_bias and signal.directional_bias != "Unknown" %}
+                                <br><span style="color: #ffaa00; font-size: 9px;">{{signal.directional_bias}}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div style="text-align: center; color: #666; font-size: 12px; padding: 20px;">All tickers have clear directional bias</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div style="background: #0a0a0a; padding: 15px; border-radius: 8px; border-left: 4px solid #00ff88;">
+                <div style="font-size: 12px; color: #00ff88; font-weight: 600; margin-bottom: 8px;">📖 SIGNAL INTERPRETATION:</div>
+                <div style="font-size: 11px; color: #ccc; line-height: 1.4;">
+                    <strong>Bullish Calls:</strong> Strong call buying interest with low put protection - institutions positioning for upside<br>
+                    <strong>Bearish Puts:</strong> Heavy put accumulation with call selling - smart money hedging or betting on downside<br>
+                    <strong>Neutral:</strong> Balanced positioning or conflicting signals - wait for clearer directional confirmation<br>
+                    <strong>Signal Strength:</strong> Strong = 3+ criteria met, Moderate = 2 criteria, Weak = 1 criteria
                 </div>
             </div>
         </div>

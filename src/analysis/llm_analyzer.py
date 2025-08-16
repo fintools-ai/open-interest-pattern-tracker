@@ -196,16 +196,18 @@ Return JSON with this enhanced structure that extracts MAXIMUM intelligence from
       "concentration_analysis": "Describe what the strike clustering reveals"
     }},
     "flow_analysis": {{
-      "net_positioning": "Bullish/Bearish based on OI changes",
+      "net_positioning": "Bullish/Bearish based on OI changes - be explicit: BULLISH_CALL_ACCUMULATION, BEARISH_PUT_ACCUMULATION, or NEUTRAL_MIXED",
       "large_blocks": ["Large OI additions at specific strikes"],
       "unusual_activity": ["Unusual patterns detected"],
-      "dark_pool_signals": "Stealth positioning if detected"
+      "dark_pool_signals": "Stealth positioning if detected",
+      "directional_bias": "CALL_HEAVY (more call than put activity) | PUT_HEAVY (more put than call activity) | BALANCED"
     }},
     "put_call_dynamics": {{
       "ratio": 1.21,
       "change": -0.05,
       "interpretation": "What the P/C ratio reveals",
-      "smart_money_view": "Institutional hedging vs directional bets"
+      "smart_money_view": "Institutional hedging vs directional bets",
+      "signal_classification": "BULLISH_CALLS (ratio < 0.5) | BEARISH_PUTS (ratio > 1.5) | NEUTRAL (0.5-1.5)"
     }},
     "max_pain_analysis": {{
       "level": 634.0,
@@ -225,6 +227,23 @@ Return JSON with this enhanced structure that extracts MAXIMUM intelligence from
     }}
   }}
 }}
+
+## SIGNAL CATEGORIZATION GUIDANCE:
+When analyzing data, pay special attention to these signal thresholds for dashboard categorization:
+
+**BULLISH CALL SIGNALS:**
+- Put/Call ratio < 0.5 (strong call bias)
+- Heavy call OI concentration 10-20% OTM
+- Net positioning shows "BULLISH_CALL_ACCUMULATION"
+- Pattern types: "institutional_accumulation", "gamma_squeeze_setup"
+
+**BEARISH PUT SIGNALS:**
+- Put/Call ratio > 1.5 (strong put bias)
+- Heavy put OI at current price levels or ITM
+- Net positioning shows "BEARISH_PUT_ACCUMULATION"
+- Pattern types: "distribution", "protective_hedging"
+
+**CRITICAL:** Ensure put_call_dynamics.ratio is always a numeric value (e.g., 1.21, 0.45, 2.3) for proper signal processing.
 
 CRITICAL: You MUST classify every ticker as either CALL or PUT direction - NO NEUTRAL allowed. Even if confidence is low, pick the most likely direction based on the data. Provide analysis and recommendations for ALL tickers regardless of confidence or success probability.
 """
