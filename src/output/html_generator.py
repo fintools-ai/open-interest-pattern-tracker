@@ -232,6 +232,7 @@ class HTMLGenerator:
         """Prepare options signals summary for dashboard"""
         bullish_calls = []
         bearish_puts = []
+        put_credit_spreads = []
         neutral_tickers = []
         
         # Process all tickers from both clusters
@@ -288,6 +289,61 @@ class HTMLGenerator:
             elif pattern_type in ["distribution", "protective_hedging"] or any(word in pattern_type for word in ["distribution", "hedging"]):
                 bearish_signals += 1
             
+            # Signal 5: Put Credit Spread Analysis
+            put_spread_signals = 0
+            current_price = float(str(ticker.get("current_price", "0")).replace("$", "").replace(",", "")) if ticker.get("current_price") else 0
+            
+            # Check for explicit put credit spread analysis from enhanced LLM
+            pcs_analysis = smart_money.get("put_credit_spread_analysis", {})
+            pcs_suitability = pcs_analysis.get("suitability", "").lower()
+            
+            if "high" in pcs_suitability:
+                put_spread_signals += 2  # Strong signal from LLM analysis
+            elif "medium" in pcs_suitability:
+                put_spread_signals += 1
+            
+            # Check for put walls and support levels
+            max_pain_analysis = smart_money.get("max_pain_analysis", {})
+            max_pain_level = float(max_pain_analysis.get("level", 0)) if max_pain_analysis.get("level") else 0
+            
+            # Strong put wall detection
+            if heavy_puts:
+                total_put_oi = sum(float(str(strike.get("oi", 0)).replace(",", "")) for strike in heavy_puts if strike.get("oi"))
+                if total_put_oi > 50000:  # Significant put OI
+                    put_spread_signals += 1
+            
+            # Max pain as support level
+            if max_pain_level > 0 and current_price > 0:
+                distance_from_max_pain = ((current_price - max_pain_level) / current_price) * 100
+                if distance_from_max_pain > 3:  # At least 3% above max pain
+                    put_spread_signals += 1
+            
+            # Protective hedging patterns suggest put walls
+            if pattern_type in ["protective_hedging"] or "hedging" in pattern_type:
+                put_spread_signals += 1
+            
+            # Pin risk analysis for put credit spreads
+            pin_risk = max_pain_analysis.get("pin_risk", "").lower()
+            if pin_risk in ["low", "medium"]:  # Avoid high pin risk
+                put_spread_signals += 1
+                
+            # Calculate safety margin for put spreads
+            put_wall_strikes = []
+            for put_strike in heavy_puts:
+                if put_strike.get("strike"):
+                    try:
+                        strike_price = float(put_strike["strike"])
+                        if current_price > 0:
+                            safety_margin = ((current_price - strike_price) / current_price) * 100
+                            if safety_margin > 5:  # At least 5% safety margin
+                                put_wall_strikes.append({
+                                    "strike": strike_price,
+                                    "oi": put_strike.get("oi", 0),
+                                    "safety_margin": safety_margin
+                                })
+                    except (ValueError, TypeError):
+                        continue
+            
             # Categorize ticker based on signals
             signal_data = {
                 "ticker": ticker_symbol,
@@ -295,15 +351,25 @@ class HTMLGenerator:
                 "confidence": ticker.get("confidence", "N/A"),
                 "pattern": ticker.get("pattern_type", "").replace("_", " ").title(),
                 "current_price": ticker.get("current_price", "N/A"),
-                "signals_count": max(bullish_signals, bearish_signals),
-                "signal_strength": "Strong" if max(bullish_signals, bearish_signals) >= 3 else "Moderate" if max(bullish_signals, bearish_signals) >= 2 else "Weak",
+                "signals_count": max(bullish_signals, bearish_signals, put_spread_signals),
+                "signal_strength": "Strong" if max(bullish_signals, bearish_signals, put_spread_signals) >= 3 else "Moderate" if max(bullish_signals, bearish_signals, put_spread_signals) >= 2 else "Weak",
                 "directional_bias": directional_bias.replace("_", " ").title() if directional_bias else "Unknown",
-                "signal_classification": pc_dynamics.get("signal_classification", "").replace("_", " ") if pc_dynamics.get("signal_classification") else ""
+                "signal_classification": pc_dynamics.get("signal_classification", "").replace("_", " ") if pc_dynamics.get("signal_classification") else "",
+                "put_spread_signals": put_spread_signals,
+                "max_pain_level": f"${max_pain_level:.2f}" if max_pain_level > 0 else "N/A",
+                "put_wall_strikes": put_wall_strikes[:3],  # Top 3 put walls
+                "safety_margin": f"{max(s['safety_margin'] for s in put_wall_strikes):.1f}%" if put_wall_strikes else "N/A",
+                "pin_risk": pin_risk.title() if pin_risk else "Unknown",
+                "pcs_suitability": pcs_suitability.title() if pcs_suitability else "Unknown",
+                "pcs_thesis": pcs_analysis.get("credit_spread_thesis", "")[:50] + "..." if pcs_analysis.get("credit_spread_thesis") else ""
             }
             
-            if bullish_signals >= 2 and bullish_signals > bearish_signals:
+            # Prioritize put credit spreads if strong signals present
+            if put_spread_signals >= 2 and len(put_wall_strikes) > 0:
+                put_credit_spreads.append(signal_data)
+            elif bullish_signals >= 2 and bullish_signals > bearish_signals and bullish_signals > put_spread_signals:
                 bullish_calls.append(signal_data)
-            elif bearish_signals >= 2 and bearish_signals > bullish_signals:
+            elif bearish_signals >= 2 and bearish_signals > bullish_signals and bearish_signals > put_spread_signals:
                 bearish_puts.append(signal_data)
             else:
                 neutral_tickers.append(signal_data)
@@ -316,14 +382,17 @@ class HTMLGenerator:
         
         bullish_calls.sort(key=sort_key, reverse=True)
         bearish_puts.sort(key=sort_key, reverse=True)
+        put_credit_spreads.sort(key=sort_key, reverse=True)
         neutral_tickers.sort(key=sort_key, reverse=True)
         
         return {
             "bullish_calls": bullish_calls,
             "bearish_puts": bearish_puts,
+            "put_credit_spreads": put_credit_spreads,
             "neutral_tickers": neutral_tickers,
             "total_bullish": len(bullish_calls),
             "total_bearish": len(bearish_puts),
+            "total_put_spreads": len(put_credit_spreads),
             "total_neutral": len(neutral_tickers)
         }
     
@@ -670,7 +739,7 @@ class HTMLGenerator:
         <div class="options-signals-section" style="background: #111; border: 1px solid #333; border-radius: 12px; padding: 25px; margin-bottom: 25px;">
             <div class="section-title">📊 Options Signal Summary</div>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 25px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <!-- BULLISH CALLS -->
                 <div style="background: #1a1a1a; border: 2px solid #00ff88; border-radius: 10px; padding: 20px;">
                     <div style="text-align: center; margin-bottom: 15px;">
@@ -743,6 +812,49 @@ class HTMLGenerator:
                     {% endif %}
                 </div>
                 
+                <!-- PUT CREDIT SPREADS -->
+                <div style="background: #1a1a1a; border: 2px solid #8a2be2; border-radius: 10px; padding: 20px;">
+                    <div style="text-align: center; margin-bottom: 15px;">
+                        <div style="font-size: 16px; font-weight: 600; color: #8a2be2; margin-bottom: 5px;">🟣 PUT SPREADS</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #fff;">{{options_signals.total_put_spreads}}</div>
+                        <div style="font-size: 11px; color: #888; margin-top: 5px;">Strong put walls</div>
+                    </div>
+                    <div style="font-size: 11px; color: #8a2be2; margin-bottom: 10px; text-transform: uppercase; font-weight: 600;">Criteria Met:</div>
+                    <div style="font-size: 10px; color: #ccc; line-height: 1.4; margin-bottom: 15px;">
+                        • Massive put OI (>50K contracts)<br>
+                        • Price >3% above max pain<br>
+                        • Strong support levels<br>
+                        • >5% safety margin
+                    </div>
+                    {% if options_signals.put_credit_spreads %}
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        {% for signal in options_signals.put_credit_spreads %}
+                        <div style="background: #0a0a0a; padding: 8px; margin-bottom: 6px; border-radius: 5px; border-left: 3px solid #8a2be2;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 600; color: #fff;">{{signal.ticker}}</span>
+                                <span style="font-size: 10px; color: #8a2be2;">{{signal.signal_strength}}</span>
+                            </div>
+                            <div style="font-size: 10px; color: #888; margin-top: 2px;">
+                                Max Pain: {{signal.max_pain_level}} | Safety: {{signal.safety_margin}}
+                                {% if signal.directional_bias and signal.directional_bias != "Unknown" %}
+                                <br><span style="color: #8a2be2; font-size: 9px;">{{signal.directional_bias}}</span>
+                                {% endif %}
+                                {% if signal.put_wall_strikes %}
+                                <br><span style="color: #ccc; font-size: 9px;">Put Walls: 
+                                {% for wall in signal.put_wall_strikes %}
+                                ${{wall.strike|round}} {% if not loop.last %}, {% endif %}
+                                {% endfor %}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div style="text-align: center; color: #666; font-size: 12px; padding: 20px;">No strong put walls detected</div>
+                    {% endif %}
+                </div>
+                
                 <!-- NEUTRAL/MIXED -->
                 <div style="background: #1a1a1a; border: 2px solid #ffaa00; border-radius: 10px; padding: 20px;">
                     <div style="text-align: center; margin-bottom: 15px;">
@@ -785,6 +897,7 @@ class HTMLGenerator:
                 <div style="font-size: 11px; color: #ccc; line-height: 1.4;">
                     <strong>Bullish Calls:</strong> Strong call buying interest with low put protection - institutions positioning for upside<br>
                     <strong>Bearish Puts:</strong> Heavy put accumulation with call selling - smart money hedging or betting on downside<br>
+                    <strong>Put Credit Spreads:</strong> Massive put walls creating strong support levels - ideal for selling premium with defined risk<br>
                     <strong>Neutral:</strong> Balanced positioning or conflicting signals - wait for clearer directional confirmation<br>
                     <strong>Signal Strength:</strong> Strong = 3+ criteria met, Moderate = 2 criteria, Weak = 1 criteria
                 </div>

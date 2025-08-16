@@ -190,10 +190,12 @@ Return JSON with this enhanced structure that extracts MAXIMUM intelligence from
         {{"strike": 645, "oi": 27423, "interpretation": "Secondary target level"}}
       ],
       "heavy_put_strikes": [
-        {{"strike": 620, "oi": 58882, "interpretation": "Major support/hedge level"}},
-        {{"strike": 610, "oi": 119307, "interpretation": "Institutional protection zone"}}
+        {{"strike": 620, "oi": 58882, "interpretation": "Major support/hedge level", "distance_from_price": "5.2% OTM", "put_wall_strength": "Strong"}},
+        {{"strike": 610, "oi": 119307, "interpretation": "Institutional protection zone", "distance_from_price": "7.8% OTM", "put_wall_strength": "Very Strong"}}
       ],
-      "concentration_analysis": "Describe what the strike clustering reveals"
+      "concentration_analysis": "Describe what the strike clustering reveals",
+      "put_wall_analysis": "Identify strikes with >30K OI that could serve as put credit spread support levels",
+      "safety_assessment": "Evaluate distance from current price to major put strikes for spread safety"
     }},
     "flow_analysis": {{
       "net_positioning": "Bullish/Bearish based on OI changes - be explicit: BULLISH_CALL_ACCUMULATION, BEARISH_PUT_ACCUMULATION, or NEUTRAL_MIXED",
@@ -212,8 +214,10 @@ Return JSON with this enhanced structure that extracts MAXIMUM intelligence from
     "max_pain_analysis": {{
       "level": 634.0,
       "shift": 2.0,
-      "pin_risk": "High/Medium/Low",
-      "dealer_impact": "How dealers will hedge"
+      "pin_risk": "High/Medium/Low - CRITICAL for put credit spread safety",
+      "dealer_impact": "How dealers will hedge",
+      "support_strength": "Strong/Medium/Weak - based on OI concentration at max pain",
+      "safety_margin": "Calculate percentage distance from current price to max pain level"
     }},
     "gamma_analysis": {{
       "net_exposure": "Positive/Negative gamma zones with detailed explanation",
@@ -224,6 +228,20 @@ Return JSON with this enhanced structure that extracts MAXIMUM intelligence from
       "gamma_profile": "Distribution of gamma across strikes",
       "dealer_positioning": "How market makers will hedge and impact price action",
       "squeeze_catalyst": "What could trigger the gamma squeeze (earnings, news, etc.)"
+    }},
+    "put_credit_spread_analysis": {{
+      "suitability": "High/Medium/Low/None - based on put wall strength and safety margins",
+      "recommended_strikes": {{
+        "short_put": 610,
+        "long_put": 600,
+        "safety_margin": "7.8% to short strike",
+        "max_profit": "Credit received",
+        "max_risk": "Width of spread minus credit"
+      }},
+      "risk_factors": ["Pin risk assessment", "Early assignment risk", "Volatility expansion risk"],
+      "ideal_entry_conditions": ["Price above max pain", "Low volatility environment", "Strong put wall intact"],
+      "put_wall_integrity": "Strong/Weak - likelihood of put support holding",
+      "credit_spread_thesis": "Why this setup favors premium sellers vs buyers"
     }}
   }}
 }}
@@ -242,6 +260,13 @@ When analyzing data, pay special attention to these signal thresholds for dashbo
 - Heavy put OI at current price levels or ITM
 - Net positioning shows "BEARISH_PUT_ACCUMULATION"
 - Pattern types: "distribution", "protective_hedging"
+
+**PUT CREDIT SPREAD SIGNALS:**
+- Massive put OI concentrations (>50,000 contracts) creating "put walls"
+- Current price significantly above max pain level (>3% safety margin)
+- Heavy put strikes well below current price (>5% OTM)
+- Low to medium pin risk (avoid high pin risk scenarios)
+- Pattern types: "protective_hedging" indicating institutional support levels
 
 **CRITICAL:** Ensure put_call_dynamics.ratio is always a numeric value (e.g., 1.21, 0.45, 2.3) for proper signal processing.
 
