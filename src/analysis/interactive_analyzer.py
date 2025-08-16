@@ -12,8 +12,8 @@ import boto3
 import concurrent.futures
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple, Callable
-
-from config.settings import AWS_REGION, BEDROCK_MODEL_ID
+from botocore.config import Config
+from config.settings import AWS_REGION, BEDROCK_MODEL_ID, MCP_MARKET_DATA_EXECUTABLE
 from data_pipeline.redis_manager import RedisManager
 from data_pipeline.collector import MCPOIClient
 
@@ -26,9 +26,13 @@ class InteractiveAnalysisService:
     Based on VTS Agent architecture with Bedrock Converse API
     """
     
-    def __init__(self, max_workers=10, timeout=30):
+    def __init__(self, max_workers=10, timeout=300):
         """Initialize the analysis service with proper Bedrock client"""
-        self.bedrock_client = boto3.client('bedrock-runtime', region_name=AWS_REGION)
+        self.bedrock_client = boto3.client(
+            'bedrock-runtime',
+            region_name=AWS_REGION,
+            config=Config(connect_timeout=240, read_timeout=240))
+
         self.model_id = BEDROCK_MODEL_ID
         self.redis_manager = RedisManager()
         self.active_sessions = {}
@@ -484,7 +488,7 @@ CRITICAL: When user asks questions, use tools to get fresh data first, then anal
             
             result = await client.call_tool("analyze_open_interest", {
                 "ticker": ticker,
-                "days": days,
+                "days": target_dte,
                 "target_dte": target_dte,
                 "include_news": include_news
             })
@@ -508,7 +512,7 @@ CRITICAL: When user asks questions, use tools to get fresh data first, then anal
         """Tool: Get market data via MCP service with proper executable path"""
         try:
             # Use the correct market data executable path 
-            market_data_executable = "/Users/sayantan/Documents/Workspace/mcp_env/market_data_server/bin/mcp-market-data-server"
+            market_data_executable = MCP_MARKET_DATA_EXECUTABLE
             
             # Call the market data MCP service directly
             init_msg = json.dumps({
