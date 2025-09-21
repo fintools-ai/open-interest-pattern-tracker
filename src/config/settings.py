@@ -23,7 +23,7 @@ TICKERS = [
 ]
 
 
-# Analysis Parameters
-OI_ANALYSIS_DAYS = 30
-TARGET_DTE = 30
+# Analysis Parameters - Multi-Timeframe
+OI_ANALYSIS_DAYS = [30, 50, 60, 90]  # Multiple DTE periods for analysis
+DEFAULT_DTE = 30  # Default for backwards compatibility
 CONFIDENCE_THRESHOLD = 0.50

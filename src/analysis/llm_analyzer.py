@@ -5,17 +5,20 @@ LLM Analyzer - Uses AWS Bedrock to analyze OI patterns and generate trade recomm
 import json
 import boto3
 from datetime import datetime
-from config.settings import AWS_REGION, BEDROCK_MODEL_ID, TARGET_DTE
+from config.settings import AWS_REGION, BEDROCK_MODEL_ID, DEFAULT_DTE
 
 class LLMAnalyzer:
     def __init__(self):
         self.bedrock_client = boto3.client('bedrock-runtime', region_name=AWS_REGION)
         self.model_id = BEDROCK_MODEL_ID
     
-    def analyze_ticker(self, ticker_data, delta_data, market_context=None, price_data=None):
+    def analyze_ticker(self, ticker_data, delta_data, market_context=None, price_data=None, dte_period=None):
         """Analyze OI data with current prices and technical zones to generate trading recommendations"""
+        if dte_period is None:
+            dte_period = DEFAULT_DTE
+
         try:
-            prompt = self._build_analysis_prompt(ticker_data, delta_data, market_context, price_data)
+            prompt = self._build_analysis_prompt(ticker_data, delta_data, market_context, price_data, dte_period)
             
             #print(prompt)
             #print("--------------------------------------------------")
@@ -40,13 +43,19 @@ class LLMAnalyzer:
                 "analysis_timestamp": datetime.now().isoformat()
             }
     
-    def _build_analysis_prompt(self, ticker_data, delta_data, market_context, price_data):
+    def _build_analysis_prompt(self, ticker_data, delta_data, market_context, price_data, dte_period):
         """Build simple prompt with raw data dumps"""
         ticker = ticker_data.get("ticker", "UNKNOWN")
-        
+
         prompt = f"""You are a professional options trader with 15+ years experience. Analyze this comprehensive dataset for {ticker} like you're preparing a trading desk report.
 
-IMPORTANT: Use exactly {TARGET_DTE} days to expiration (DTE) for all recommendations.
+IMPORTANT: Use exactly {dte_period} days to expiration (DTE) for all recommendations.
+
+# TIMEFRAME CONTEXT
+You are analyzing {dte_period} DTE options for {ticker}. Consider these timeframe-specific factors:
+- 30 DTE: Short-term gamma effects, earnings catalysts, momentum plays
+- 50-60 DTE: Balanced theta/gamma, swing trading setups
+- 90 DTE: Institutional hedging, strategic positioning, longer-term trends
 
 # RAW DATA
 
@@ -156,7 +165,7 @@ Return JSON with this enhanced structure that extracts MAXIMUM intelligence from
     "target_price": 185.00,
     "stop_loss": 170.00,
     "expiry_date": "YYYY-MM-DD",
-    "days_to_expiry": {TARGET_DTE},
+    "days_to_expiry": {dte_period},
     "risk_reward_ratio": "1:2.0",
     "success_probability": 75,
     "position_size_pct": 2.5,

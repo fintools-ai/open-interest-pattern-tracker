@@ -150,80 +150,94 @@ class OIPatternTracker:
             else:
                 print("Market context unavailable - proceeding without")
             
-            # Phase 3: Delta Calculation & Storage
-            print("\nPhase 3: Delta Calculation & Redis Storage")
+            # Phase 3: Multi-Timeframe Delta Calculation & Storage
+            print("\nPhase 3: Multi-Timeframe Delta Calculation & Redis Storage")
             today = datetime.now().strftime('%Y-%m-%d')
-            
+
             processed_tickers = []
-            for ticker, data in ticker_data.items():
-                oi_data = data.get("oi_data")
-                market_data = data.get("market_data")
-                
-                if oi_data:
-                    # Store current OI data in Redis
-                    self.redis_manager.store_oi_data(ticker, today, oi_data)
-                    
-                    # Calculate deltas
-                    previous_data = self.redis_manager.get_previous_oi_data(ticker, days_back=1)
-                    print(f"  {ticker}: Previous data available: {'Yes' if previous_data else 'No'}")
-                    
-                    delta_data = self.delta_calculator.calculate_deltas(oi_data, previous_data, ticker)
-                    
-                    # Log delta calculation results
-                    if delta_data.get("is_baseline"):
-                        print(f"  {ticker}: Delta baseline created (first run)")
-                    elif delta_data.get("error"):
-                        print(f"  {ticker}: Delta calculation error: {delta_data['error']}")
+            total_analyses = 0
+
+            # Iterate through each ticker and each DTE period
+            for ticker, dte_data in ticker_data.items():
+                print(f"\n  Processing {ticker} across {len(dte_data)} timeframes...")
+
+                for dte_period_str, data in dte_data.items():
+                    dte_period = int(dte_period_str)
+                    oi_data = data.get("oi_data")
+                    market_data = data.get("market_data")
+
+                    print(f"    {ticker} ({dte_period} DTE)...")
+
+                    if oi_data:
+                        # Store current OI data in Redis with DTE-specific key
+                        oi_key = f"{ticker}:{dte_period}DTE"
+                        self.redis_manager.store_oi_data(oi_key, today, oi_data)
+
+                        # Calculate deltas
+                        previous_data = self.redis_manager.get_previous_oi_data(oi_key, days_back=1)
+                        print(f"      Previous data available: {'Yes' if previous_data else 'No'}")
+
+                        delta_data = self.delta_calculator.calculate_deltas(oi_data, previous_data, oi_key)
+
+                        # Log delta calculation results
+                        if delta_data.get("is_baseline"):
+                            print(f"      Delta baseline created (first run)")
+                        elif delta_data.get("error"):
+                            print(f"      Delta calculation error: {delta_data['error']}")
+                        else:
+                            # Log key delta metrics
+                            pcr_delta = delta_data.get("put_call_ratio_delta", 0)
+                            max_pain_shift = delta_data.get("max_pain_shift", 0)
+                            total_oi_change = delta_data.get("total_oi_change", 0)
+                            print(f"      P/C Δ: {pcr_delta:.3f}, Max Pain Δ: ${max_pain_shift:.2f}, OI Δ: {total_oi_change}")
+
+                        # Store delta data with DTE-specific key
+                        self.redis_manager.store_delta_data(oi_key, today, delta_data)
+
+                        # Create ticker result for analysis
+                        processed_tickers.append({
+                            "ticker": ticker,
+                            "dte_period": dte_period,
+                            "oi_data": oi_data,
+                            "delta": delta_data,
+                            "market_data": market_data
+                        })
                     else:
-                        # Log key delta metrics
-                        pcr_delta = delta_data.get("put_call_ratio_delta", 0)
-                        max_pain_shift = delta_data.get("max_pain_shift", 0)
-                        total_oi_change = delta_data.get("total_oi_change", 0)
-                        print(f"  {ticker}: P/C Δ: {pcr_delta:.3f}, Max Pain Δ: ${max_pain_shift:.2f}, OI Δ: {total_oi_change}")
-                    
-                    # Store delta data
-                    self.redis_manager.store_delta_data(ticker, today, delta_data)
-                    
-                    # Create ticker result for analysis
-                    processed_tickers.append({
-                        "ticker": ticker,
-                        "oi_data": oi_data,
-                        "delta": delta_data,
-                        "market_data": market_data
-                    })
-                else:
-                    print(f"  Warning: No OI data for {ticker}")
-                    # Create empty delta with proper structure for LLM
-                    empty_delta = {
-                        "ticker": ticker,
-                        "message": "No OI data available for delta calculation",
-                        "is_baseline": True,
-                        "put_call_ratio_delta": 0,
-                        "max_pain_shift": 0,
-                        "total_oi_change": 0,
-                        "call_oi_change": 0,
-                        "put_oi_change": 0
-                    }
-                    processed_tickers.append({
-                        "ticker": ticker,
-                        "oi_data": {},
-                        "delta": empty_delta,
-                        "market_data": market_data
-                    })
+                        print(f"      Warning: No OI data for {ticker} ({dte_period} DTE)")
+                        # Create empty delta with proper structure for LLM
+                        empty_delta = {
+                            "ticker": ticker,
+                            "dte_period": dte_period,
+                            "message": "No OI data available for delta calculation",
+                            "is_baseline": True,
+                            "put_call_ratio_delta": 0,
+                            "max_pain_shift": 0,
+                            "total_oi_change": 0,
+                            "call_oi_change": 0,
+                            "put_oi_change": 0
+                        }
+                        processed_tickers.append({
+                            "ticker": ticker,
+                            "dte_period": dte_period,
+                            "oi_data": {},
+                            "delta": empty_delta,
+                            "market_data": market_data
+                        })
+
+                    total_analyses += 1
+
+            print(f"Calculated deltas and stored data for {total_analyses} ticker/timeframe combinations ({len(ticker_data)} tickers x {len(self.collector.analysis_days)} timeframes)")
             
-            print(f"Calculated deltas and stored data for {len(processed_tickers)} tickers")
-            
-            # Phase 4: LLM Analysis
-            print("\nPhase 4: Enhanced LLM Analysis with Price Context")
+            # Phase 4: Multi-Timeframe LLM Analysis
+            print("\nPhase 4: Multi-Timeframe LLM Analysis with Price Context")
             analyses = []
-            
-            # Process all tickers with enhanced price data
 
-
+            # Process all ticker/timeframe combinations
             for ticker_result in processed_tickers:
                 ticker = ticker_result["ticker"]
-                print(f"  Analyzing {ticker}...")
-                
+                dte_period = ticker_result["dte_period"]
+                print(f"  Analyzing {ticker} ({dte_period} DTE)...")
+
                 # Only analyze if we have OI data
                 if ticker_result.get("oi_data"):
                     print(f"    OI data keys: {list(ticker_result['oi_data'].keys())}")
@@ -231,29 +245,38 @@ class OIPatternTracker:
                         ticker_result["oi_data"],
                         ticker_result["delta"],
                         market_context,
-                        ticker_result.get("market_data")  # Pass market data with prices
+                        ticker_result.get("market_data"),  # Pass market data with prices
+                        dte_period  # Pass the DTE period for timeframe-specific analysis
                     )
-                    print(f"    Analysis result: {(analysis)}")
-                    
+
+                    # Add timeframe metadata to analysis result
+                    analysis["dte_period"] = dte_period
+                    analysis["timeframe_id"] = f"{ticker}_{dte_period}DTE"
+
+                    print(f"    Analysis result: {analysis.get('status', 'unknown')}")
+
                     # Log if we have price enhancement
                     if ticker_result.get("market_data") and ticker_result["market_data"].get("current_price"):
                         print(f"    Enhanced with price: ${ticker_result['market_data']['current_price']}")
                 else:
                     analysis = {
                         "ticker": ticker,
+                        "dte_period": dte_period,
+                        "timeframe_id": f"{ticker}_{dte_period}DTE",
                         "status": "error",
                         "error": "No OI data available"
                     }
-                
+
                 analyses.append(analysis)
                 print(f"    Analysis status: {analysis.get('status', 'unknown')}")
                 if analysis.get('status') == 'error':
                     print(f"    Error: {analysis.get('error', 'unknown')}")
-                
-                # Store analysis result
-                self.redis_manager.store_analysis_result(ticker, today, analysis)
-            
-            print(f"Completed LLM analysis for {len(analyses)} tickers")
+
+                # Store analysis result with DTE-specific key
+                analysis_key = f"{ticker}:{dte_period}DTE"
+                self.redis_manager.store_analysis_result(analysis_key, today, analysis)
+
+            print(f"Completed LLM analysis for {len(analyses)} ticker/timeframe combinations")
             
             print("--------")
             print(json.dumps(analyses, indent=2))

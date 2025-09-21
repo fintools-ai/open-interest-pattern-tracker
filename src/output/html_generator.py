@@ -109,13 +109,18 @@ class HTMLGenerator:
             return None
     
     def _prepare_dashboard_data(self, clusters, market_context):
-        """Prepare data for dashboard template"""
+        """Prepare data for dashboard template with multi-timeframe support"""
         high_conviction_trades = self._get_high_conviction_trades(clusters, max_count=3)
         all_recommendations = self._get_all_recommendations(clusters)
         market_pulse = self._prepare_market_pulse(clusters, market_context)
         gamma_squeeze_data = self._prepare_gamma_squeeze_data(clusters)
         options_signals = self._prepare_options_signals(clusters)
-        
+
+        # Multi-timeframe data preparation
+        multi_timeframe_data = self._prepare_multi_timeframe_data(clusters)
+        timeframe_comparison = self._prepare_timeframe_comparison_table(clusters)
+        confluence_summary = self._prepare_confluence_summary(clusters)
+
         template_data = {
             # Header stats
             "patterns_found": len(clusters["bullish_group"]["pattern_types"]) + len(clusters["bearish_group"]["pattern_types"]),
@@ -123,31 +128,135 @@ class HTMLGenerator:
             "avg_success_rate": self._calculate_overall_success_rate(clusters),
             "active_signals": clusters["bullish_group"]["total_count"] + clusters["bearish_group"]["total_count"],
             "last_update": datetime.now().strftime("%B %d, %Y at %I:%M %p ET"),
-            
+
             # Market pulse data
             "market_pulse": market_pulse,
-            
+
             # Gamma squeeze analysis data
             "gamma_squeeze_data": gamma_squeeze_data,
-            
+
             # Options signals summary
             "options_signals": options_signals,
-            
+
             # ALL trades for featured cards
             "high_conviction_trades": high_conviction_trades,
-            
+
             # All recommendations for table
             "all_recommendations": all_recommendations,
-            
+
             # Risk metrics (calculated from positions)
             "risk_metrics": self._calculate_risk_metrics(all_recommendations),
-            
+
             # Clustering summary
             "bullish_count": clusters["bullish_group"]["total_count"],
-            "bearish_count": clusters["bearish_group"]["total_count"]
+            "bearish_count": clusters["bearish_group"]["total_count"],
+
+            # Multi-timeframe data
+            "multi_timeframe_trades": multi_timeframe_data,
+            "timeframe_comparison": timeframe_comparison,
+            "confluence_summary": confluence_summary,
+            "has_multi_timeframe": bool(clusters.get("multi_timeframe", {}).get("by_ticker"))
         }
-        
+
         return template_data
+
+    def _prepare_multi_timeframe_data(self, clusters):
+        """Prepare multi-timeframe trade data for dashboard"""
+        multi_timeframe_section = clusters.get("multi_timeframe", {})
+        by_ticker_data = multi_timeframe_section.get("by_ticker", {})
+
+        multi_timeframe_trades = []
+
+        for ticker, confluence_data in by_ticker_data.items():
+            timeframes = confluence_data.get("timeframes", {})
+
+            # Prepare timeframe data for each ticker
+            timeframe_entries = []
+            for dte, analysis in timeframes.items():
+                direction_class = "bullish" if analysis.get("classification") == "bullish" else "bearish"
+                direction_color = "#00ff88" if direction_class == "bullish" else "#ff4444"
+
+                timeframe_entries.append({
+                    "dte": dte,
+                    "direction": analysis.get("direction", "NEUTRAL"),
+                    "confidence": safe_int(analysis.get("confidence", 0)),
+                    "success_probability": safe_int(analysis.get("success_probability", 0)),
+                    "pattern_type": analysis.get("pattern_type", "unknown"),
+                    "direction_class": direction_class,
+                    "direction_color": direction_color
+                })
+
+            # Sort timeframes by DTE
+            timeframe_entries.sort(key=lambda x: int(x["dte"]))
+
+            # Determine overall confluence
+            confluence_type = confluence_data.get("confluence_type", "unknown")
+            confluence_class = {
+                "aligned": "success",
+                "divergent": "warning",
+                "unclear": "neutral"
+            }.get(confluence_type, "neutral")
+
+            multi_timeframe_trades.append({
+                "ticker": ticker,
+                "timeframes": timeframe_entries,
+                "confluence_type": confluence_type,
+                "confluence_class": confluence_class,
+                "overall_direction": confluence_data.get("overall_direction", "mixed"),
+                "avg_confidence": confluence_data.get("avg_confidence", 0)
+            })
+
+        # Sort by average confidence descending
+        multi_timeframe_trades.sort(key=lambda x: x["avg_confidence"], reverse=True)
+
+        return multi_timeframe_trades
+
+    def _prepare_timeframe_comparison_table(self, clusters):
+        """Prepare timeframe comparison table data"""
+        multi_timeframe_section = clusters.get("multi_timeframe", {})
+        timeframe_stats = multi_timeframe_section.get("timeframe_stats", {})
+
+        comparison_data = []
+        for dte, stats in timeframe_stats.items():
+            bullish_pct = stats.get("bullish_percentage", 0)
+            market_bias = stats.get("market_bias", "mixed")
+
+            bias_class = {
+                "bullish": "success",
+                "bearish": "danger",
+                "mixed": "warning"
+            }.get(market_bias, "secondary")
+
+            comparison_data.append({
+                "dte": dte,
+                "total_signals": stats.get("total_signals", 0),
+                "bullish_signals": stats.get("bullish_signals", 0),
+                "bearish_signals": stats.get("bearish_signals", 0),
+                "bullish_percentage": f"{bullish_pct:.1f}%",
+                "avg_confidence": f"{stats.get('avg_confidence', 0):.1f}%",
+                "market_bias": market_bias.title(),
+                "bias_class": bias_class
+            })
+
+        # Sort by DTE
+        comparison_data.sort(key=lambda x: int(x["dte"]))
+
+        return comparison_data
+
+    def _prepare_confluence_summary(self, clusters):
+        """Prepare confluence summary for dashboard"""
+        multi_timeframe_section = clusters.get("multi_timeframe", {})
+        confluence_summary = multi_timeframe_section.get("confluence_summary", {})
+
+        return {
+            "total_tickers": confluence_summary.get("total_tickers_analyzed", 0),
+            "aligned_signals": confluence_summary.get("aligned_signals", 0),
+            "divergent_signals": confluence_summary.get("divergent_signals", 0),
+            "unclear_signals": confluence_summary.get("unclear_signals", 0),
+            "alignment_rate": f"{confluence_summary.get('alignment_rate', 0):.1f}%",
+            "high_conviction_aligned": confluence_summary.get("high_conviction_aligned", []),
+            "notable_divergences": confluence_summary.get("notable_divergences", [])
+        }
     
     def _prepare_gamma_squeeze_data(self, clusters):
         """Prepare gamma squeeze analysis data for dashboard"""
@@ -903,7 +1012,154 @@ class HTMLGenerator:
                 </div>
             </div>
         </div>
-        
+
+        {% if has_multi_timeframe %}
+        <!-- Multi-Timeframe Analysis Section -->
+        <div style="background: #111; border: 1px solid #333; border-radius: 12px; padding: 25px; margin-bottom: 25px;">
+            <div class="section-title">
+                🔄 Multi-Timeframe Analysis
+                <span style="background: #00ff88; color: #000; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-left: 15px;">NEW</span>
+            </div>
+
+            <!-- Confluence Summary -->
+            <div style="background: #0a0a0a; border: 1px solid #333; border-radius: 8px; padding: 20px; margin-bottom: 25px;">
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 20px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 8px;">Total Tickers</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #fff;">{{confluence_summary.total_tickers}}</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 8px;">Aligned Signals</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #00ff88;">{{confluence_summary.aligned_signals}}</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 8px;">Divergent Signals</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #ff4444;">{{confluence_summary.divergent_signals}}</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 8px;">Alignment Rate</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #ffaa00;">{{confluence_summary.alignment_rate}}</div>
+                    </div>
+                </div>
+
+                <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">📊 Timeframe Statistics</div>
+                <table style="width: 100%; border-collapse: collapse; background: #1a1a1a; border-radius: 8px; overflow: hidden;">
+                    <thead>
+                        <tr style="background: #0a0a0a;">
+                            <th style="padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 600; border-bottom: 1px solid #333;">DTE</th>
+                            <th style="padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 600; border-bottom: 1px solid #333;">Total Signals</th>
+                            <th style="padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 600; border-bottom: 1px solid #333;">Bullish</th>
+                            <th style="padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 600; border-bottom: 1px solid #333;">Bearish</th>
+                            <th style="padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 600; border-bottom: 1px solid #333;">Bullish %</th>
+                            <th style="padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 600; border-bottom: 1px solid #333;">Avg Confidence</th>
+                            <th style="padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 600; border-bottom: 1px solid #333;">Market Bias</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for timeframe in timeframe_comparison %}
+                        <tr style="border-bottom: 1px solid #222;">
+                            <td style="padding: 12px; font-size: 13px; font-weight: 700; color: #fff;">{{timeframe.dte}} DTE</td>
+                            <td style="padding: 12px; font-size: 13px;">{{timeframe.total_signals}}</td>
+                            <td style="padding: 12px; font-size: 13px; color: #00ff88;">{{timeframe.bullish_signals}}</td>
+                            <td style="padding: 12px; font-size: 13px; color: #ff4444;">{{timeframe.bearish_signals}}</td>
+                            <td style="padding: 12px; font-size: 13px; font-weight: 600;">{{timeframe.bullish_percentage}}</td>
+                            <td style="padding: 12px; font-size: 13px;">{{timeframe.avg_confidence}}</td>
+                            <td style="padding: 12px; font-size: 13px;">
+                                <span style="padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; {% if timeframe.bias_class == 'success' %}background: rgba(0, 255, 136, 0.2); color: #00ff88; border: 1px solid #00ff88;{% elif timeframe.bias_class == 'danger' %}background: rgba(255, 68, 68, 0.2); color: #ff4444; border: 1px solid #ff4444;{% else %}background: rgba(255, 170, 0, 0.2); color: #ffaa00; border: 1px solid #ffaa00;{% endif %}">
+                                    {{timeframe.market_bias}}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Individual Ticker Multi-Timeframe Analysis -->
+            <div style="font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 20px;">Individual Ticker Analysis</div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 25px;">
+                {% for ticker_data in multi_timeframe_trades %}
+                <div style="background: #1a1a1a; border: 2px solid #333; border-radius: 12px; overflow: hidden; {% if ticker_data.confluence_class == 'success' %}border-left: 4px solid #00ff88;{% elif ticker_data.confluence_class == 'warning' %}border-left: 4px solid #ffaa00;{% else %}border-left: 4px solid #666;{% endif %}">
+                    <!-- Ticker Header -->
+                    <div style="background: #0a0a0a; padding: 20px; border-bottom: 1px solid #333;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="font-size: 24px; font-weight: 700; color: #fff;">{{ticker_data.ticker}}</div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 12px; color: #888; margin-bottom: 4px;">CONFLUENCE</div>
+                                <div style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; {% if ticker_data.confluence_class == 'success' %}background: #00ff88; color: #000;{% elif ticker_data.confluence_class == 'warning' %}background: #ffaa00; color: #000;{% else %}background: #666; color: #fff;{% endif %}">
+                                    {{ticker_data.confluence_type.upper()}}
+                                </div>
+                                <div style="font-size: 11px; color: #888; margin-top: 4px;">Avg: {{ticker_data.avg_confidence|round}}%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timeframe Comparison -->
+                    <div style="padding: 20px;">
+                        <div style="font-size: 12px; color: #888; margin-bottom: 15px; text-transform: uppercase; font-weight: 600;">Timeframe Analysis</div>
+                        <div style="background: #0a0a0a; border-radius: 8px; overflow: hidden;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: #111;">
+                                        <th style="padding: 10px; font-size: 10px; text-transform: uppercase; color: #888; text-align: left; border-bottom: 1px solid #333;">DTE</th>
+                                        <th style="padding: 10px; font-size: 10px; text-transform: uppercase; color: #888; text-align: left; border-bottom: 1px solid #333;">Direction</th>
+                                        <th style="padding: 10px; font-size: 10px; text-transform: uppercase; color: #888; text-align: left; border-bottom: 1px solid #333;">Confidence</th>
+                                        <th style="padding: 10px; font-size: 10px; text-transform: uppercase; color: #888; text-align: left; border-bottom: 1px solid #333;">Success Prob</th>
+                                        <th style="padding: 10px; font-size: 10px; text-transform: uppercase; color: #888; text-align: left; border-bottom: 1px solid #333;">Pattern</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for tf in ticker_data.timeframes %}
+                                    <tr style="border-bottom: 1px solid #222;">
+                                        <td style="padding: 10px; font-size: 12px; font-weight: 600; color: #fff;">{{tf.dte}}D</td>
+                                        <td style="padding: 10px; font-size: 12px;">
+                                            <span style="padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; {% if tf.direction_class == 'bullish' %}background: rgba(0, 255, 136, 0.2); color: #00ff88; border: 1px solid #00ff88;{% else %}background: rgba(255, 68, 68, 0.2); color: #ff4444; border: 1px solid #ff4444;{% endif %}">
+                                                {{tf.direction}}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 10px; font-size: 12px; color: {{tf.direction_color}};">{{tf.confidence}}%</td>
+                                        <td style="padding: 10px; font-size: 12px; color: {{tf.direction_color}};">{{tf.success_probability}}%</td>
+                                        <td style="padding: 10px; font-size: 11px; color: #ccc;">{{tf.pattern_type}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Confluence Analysis -->
+                        <div style="margin-top: 15px; padding: 15px; background: #0a0a0a; border-radius: 8px; border-left: 4px solid {% if ticker_data.confluence_class == 'success' %}#00ff88{% elif ticker_data.confluence_class == 'warning' %}#ffaa00{% else %}#666{% endif %};">
+                            <div style="font-size: 11px; color: {% if ticker_data.confluence_class == 'success' %}#00ff88{% elif ticker_data.confluence_class == 'warning' %}#ffaa00{% else %}#888{% endif %}; font-weight: 600; margin-bottom: 8px; text-transform: uppercase;">
+                                {% if ticker_data.confluence_type == 'aligned' %}✅ TIMEFRAME ALIGNED
+                                {% elif ticker_data.confluence_type == 'divergent' %}⚠️ CONFLICTING SIGNALS
+                                {% else %}❓ UNCLEAR DIRECTION{% endif %}
+                            </div>
+                            <div style="font-size: 11px; color: #ccc; line-height: 1.4;">
+                                {% if ticker_data.confluence_type == 'aligned' %}
+                                    All timeframes show consistent {{ticker_data.overall_direction}} positioning. High conviction institutional signal.
+                                {% elif ticker_data.confluence_type == 'divergent' %}
+                                    Short-term vs long-term signals conflict. Suggests tactical trading vs strategic positioning by institutions.
+                                {% else %}
+                                    Mixed or unclear signals across timeframes. Wait for directional clarity.
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div style="margin-top: 20px; padding: 15px; background: #0a0a0a; border-radius: 8px; border-left: 4px solid #00ff88;">
+                <div style="font-size: 12px; color: #00ff88; font-weight: 600; margin-bottom: 8px;">📖 MULTI-TIMEFRAME INSIGHTS:</div>
+                <div style="font-size: 11px; color: #ccc; line-height: 1.4;">
+                    <strong>Aligned Signals:</strong> When all timeframes agree, institutions show consistent positioning - highest conviction trades<br>
+                    <strong>Divergent Signals:</strong> Short-term bullish but long-term bearish often indicates profit-taking with hedging<br>
+                    <strong>Timeframe Evolution:</strong> Patterns can strengthen, weaken, or reverse as time horizon changes<br>
+                    <strong>Trading Strategy:</strong> Use short-term signals for entries, long-term signals for position sizing and risk management
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="gamma-section">
             <div class="section-title">⚡ Gamma Squeeze Detection</div>
             
