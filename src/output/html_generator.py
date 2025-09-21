@@ -1536,8 +1536,10 @@ class HTMLGenerator:
                                 </div>
                             </div>
 
-                            <div class="timeframe-analysis">
-                                <strong>{{dte}}D Analysis:</strong> {{data.analysis}}
+                            <!-- LLM Analysis - Main narrative -->
+                            <div style="background: #0a0a0a; border: 1px solid #333; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                                <div style="font-size: 12px; color: #00ff88; margin-bottom: 10px; text-transform: uppercase; font-weight: 600;">🧠 LLM Analysis ({{dte}}D Timeframe)</div>
+                                <div style="font-size: 13px; color: #e0e0e0; line-height: 1.5;">{{data.analysis}}</div>
                             </div>
 
                             {% if data.supporting_evidence %}
@@ -1555,6 +1557,63 @@ class HTMLGenerator:
                             <div style="background: #1a1a1a; border: 1px solid #444; border-radius: 8px; padding: 15px; margin-top: 15px;">
                                 <div style="font-size: 12px; color: #00ff88; margin-bottom: 12px; text-transform: uppercase; font-weight: 600;">🎯 Smart Money Intelligence</div>
 
+                                <!-- Put/Call Dynamics -->
+                                {% if data.smart_money_insights.put_call_dynamics %}
+                                <div style="margin-bottom: 12px;">
+                                    <div style="font-size: 11px; color: #888; margin-bottom: 6px;">PUT/CALL DYNAMICS:</div>
+                                    <div style="display: flex; gap: 15px;">
+                                        <span style="font-size: 10px; color: #fff;">P/C Ratio: <strong style="color: #ffaa00;">{{data.smart_money_insights.put_call_dynamics.ratio}}</strong></span>
+                                        {% if data.smart_money_insights.put_call_dynamics.signal_classification %}
+                                        <span style="font-size: 10px; color: #00ff88;">{{data.smart_money_insights.put_call_dynamics.signal_classification}}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Flow Analysis -->
+                                {% if data.smart_money_insights.flow_analysis %}
+                                <div style="margin-bottom: 12px;">
+                                    <div style="font-size: 11px; color: #888; margin-bottom: 6px;">INSTITUTIONAL FLOW:</div>
+                                    {% if data.smart_money_insights.flow_analysis.directional_bias %}
+                                    <div style="font-size: 10px; color: #00ff88; margin-bottom: 4px;">{{data.smart_money_insights.flow_analysis.directional_bias}}</div>
+                                    {% endif %}
+                                    {% if data.smart_money_insights.flow_analysis.net_positioning %}
+                                    <div style="font-size: 10px; color: #ccc;">{{data.smart_money_insights.flow_analysis.net_positioning}}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+
+                                <!-- Gamma Analysis -->
+                                {% if data.smart_money_insights.gamma_analysis %}
+                                <div style="margin-bottom: 12px;">
+                                    <div style="font-size: 11px; color: #888; margin-bottom: 6px;">GAMMA EXPOSURE:</div>
+                                    <div style="display: flex; gap: 15px;">
+                                        {% if data.smart_money_insights.gamma_analysis.squeeze_risk %}
+                                        <span style="font-size: 10px; color: #ff4444;">Risk: {{data.smart_money_insights.gamma_analysis.squeeze_risk}}</span>
+                                        {% endif %}
+                                        {% if data.smart_money_insights.gamma_analysis.flip_point %}
+                                        <span style="font-size: 10px; color: #ffaa00;">Flip: ${{data.smart_money_insights.gamma_analysis.flip_point}}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Max Pain Analysis -->
+                                {% if data.smart_money_insights.max_pain_analysis %}
+                                <div style="margin-bottom: 12px;">
+                                    <div style="font-size: 11px; color: #888; margin-bottom: 6px;">MAX PAIN LEVEL:</div>
+                                    <div style="display: flex; gap: 15px;">
+                                        {% if data.smart_money_insights.max_pain_analysis.level %}
+                                        <span style="font-size: 10px; color: #ffaa00;">Level: ${{data.smart_money_insights.max_pain_analysis.level}}</span>
+                                        {% endif %}
+                                        {% if data.smart_money_insights.max_pain_analysis.pin_risk %}
+                                        <span style="font-size: 10px; color: #ccc;">Pin Risk: {{data.smart_money_insights.max_pain_analysis.pin_risk}}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- OI Concentration -->
                                 {% if data.smart_money_insights.oi_concentration_zones %}
                                 <div style="margin-bottom: 12px;">
                                     <div style="font-size: 11px; color: #888; margin-bottom: 6px;">OI CONCENTRATION:</div>
@@ -1574,6 +1633,21 @@ class HTMLGenerator:
                                         {% endfor %}
                                     </div>
                                     {% endif %}
+                                </div>
+                                {% endif %}
+
+                                <!-- Put Credit Spread Analysis -->
+                                {% if data.smart_money_insights.put_credit_spread_analysis %}
+                                <div style="margin-bottom: 0;">
+                                    <div style="font-size: 11px; color: #888; margin-bottom: 6px;">PUT SPREAD SETUP:</div>
+                                    <div style="display: flex; gap: 15px;">
+                                        {% if data.smart_money_insights.put_credit_spread_analysis.suitability %}
+                                        <span style="font-size: 10px; color: #8a2be2;">Suitability: {{data.smart_money_insights.put_credit_spread_analysis.suitability}}</span>
+                                        {% endif %}
+                                        {% if data.smart_money_insights.put_credit_spread_analysis.safety_margin %}
+                                        <span style="font-size: 10px; color: #ccc;">Safety: {{data.smart_money_insights.put_credit_spread_analysis.safety_margin}}</span>
+                                        {% endif %}
+                                    </div>
                                 </div>
                                 {% endif %}
                             </div>
