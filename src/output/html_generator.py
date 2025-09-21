@@ -138,8 +138,9 @@ class HTMLGenerator:
             # Options signals summary
             "options_signals": options_signals,
 
-            # ALL trades for featured cards
+            # ALL trades for featured cards (consolidated by ticker)
             "high_conviction_trades": high_conviction_trades,
+            "consolidated_high_conviction_trades": self._get_consolidated_high_conviction_trades(clusters, max_count=6),
 
             # All recommendations for table
             "all_recommendations": all_recommendations,
@@ -618,6 +619,149 @@ class HTMLGenerator:
 
         
         return high_conviction  # Return ALL trades, not limited
+
+    def _get_consolidated_high_conviction_trades(self, clusters, max_count=6):
+        """Consolidate trades by ticker with multi-timeframe data"""
+
+        # Collect all trades across timeframes
+        all_trades = []
+        for group in ["bullish_group", "bearish_group"]:
+            if group in clusters:
+                all_trades.extend(clusters[group]["tickers"])
+
+        # Group by ticker
+        ticker_groups = {}
+        for trade in all_trades:
+            ticker = trade["ticker"]
+            if ticker not in ticker_groups:
+                ticker_groups[ticker] = []
+            ticker_groups[ticker].append(trade)
+
+        consolidated_trades = []
+        for ticker, timeframe_trades in ticker_groups.items():
+            # Sort by DTE
+            timeframe_trades.sort(key=lambda x: safe_int(x.get("dte", 30)))
+
+            # Calculate consensus
+            consensus = self._calculate_consensus(timeframe_trades)
+
+            # Get current price from first trade
+            current_price = timeframe_trades[0].get("current_price", "N/A")
+
+            # Build consolidated trade object
+            consolidated_trade = {
+                "ticker": ticker,
+                "current_price": current_price,
+                "consensus_direction": consensus["direction"],
+                "consensus_confidence": consensus["confidence"],
+                "confluence_status": consensus["confluence_status"],
+                "timeframes": {}
+            }
+
+            # Add each timeframe data
+            for trade in timeframe_trades:
+                dte = safe_int(trade.get("dte", 30))
+
+                # Determine direction from trade classification
+                direction = "bullish" if "bullish_group" in str(trade) else trade.get("direction", "bullish")
+
+                consolidated_trade["timeframes"][str(dte)] = {
+                    "pattern_type": trade["pattern_type"].replace("_", " ").title(),
+                    "direction": direction,
+                    "confidence": trade["confidence"],
+                    "entry": trade["entry"],
+                    "target": trade["target"],
+                    "stop_loss": trade["stop_loss"],
+                    "success_prob": trade["success_probability"],
+                    "risk_reward": trade["risk_reward"],
+                    "analysis": trade.get("institutional_flow", "Smart money positioning detected"),
+                    "expiry": trade.get("expiry", ""),
+                    "dte": dte,
+                    "supporting_evidence": trade.get("supporting_evidence", [])[:3],  # Top 3 evidence points
+                    "smart_money_insights": trade.get("smart_money_insights", {})
+                }
+
+            consolidated_trades.append(consolidated_trade)
+
+        # Sort by consensus confidence
+        try:
+            consolidated_trades.sort(
+                key=lambda x: float(x["consensus_confidence"].replace("%", "")),
+                reverse=True
+            )
+        except (ValueError, KeyError):
+            # Fallback sorting if confidence parsing fails
+            consolidated_trades.sort(key=lambda x: len(x["timeframes"]), reverse=True)
+
+        return consolidated_trades[:max_count]
+
+    def _calculate_consensus(self, timeframe_trades):
+        """Calculate consensus direction and confluence status"""
+
+        # Extract directions and confidences
+        directions = []
+        confidences = []
+
+        for trade in timeframe_trades:
+            # Try to extract direction from various sources
+            direction = "unknown"
+
+            # Method 1: Check pattern type for directional clues
+            pattern_type = trade.get("pattern_type", "").lower()
+            if "accumulation" in pattern_type or "squeeze" in pattern_type:
+                direction = "bullish"
+            elif "distribution" in pattern_type or "hedging" in pattern_type:
+                direction = "bearish"
+            else:
+                # Method 2: Use trade recommendation direction
+                trade_rec = trade.get("trade_recommendation", {})
+                rec_direction = trade_rec.get("direction", "").upper()
+                if "CALL" in rec_direction:
+                    direction = "bullish"
+                elif "PUT" in rec_direction:
+                    direction = "bearish"
+                else:
+                    # Method 3: Default based on typical pattern
+                    direction = "bullish"  # Default assumption
+
+            directions.append(direction)
+
+            # Extract confidence
+            confidence_str = str(trade.get("confidence", "50")).replace("%", "")
+            try:
+                confidence = float(confidence_str)
+            except ValueError:
+                confidence = 50.0  # Default confidence
+
+            confidences.append(confidence)
+
+        # Count directions
+        bullish_count = directions.count("bullish")
+        bearish_count = directions.count("bearish")
+        total_count = len(directions)
+
+        # Determine consensus
+        if bullish_count == total_count:
+            consensus_direction = "bullish"
+            confluence_status = "aligned"
+        elif bearish_count == total_count:
+            consensus_direction = "bearish"
+            confluence_status = "aligned"
+        elif abs(bullish_count - bearish_count) <= 1:
+            consensus_direction = "mixed"
+            confluence_status = "divergent"
+        else:
+            consensus_direction = "bullish" if bullish_count > bearish_count else "bearish"
+            confluence_status = "partial"
+
+        # Calculate weighted average confidence
+        avg_confidence = sum(confidences) / len(confidences) if confidences else 50.0
+
+        return {
+            "direction": consensus_direction,
+            "confidence": f"{avg_confidence:.0f}%",
+            "confluence_status": confluence_status
+        }
     
     def _get_all_recommendations(self, clusters):
         """Get all recommendations for the main table"""
@@ -728,14 +872,62 @@ class HTMLGenerator:
         .positive { color: #00ff88; }
         .negative { color: #ff4444; }
         .conviction-section { background: #111; border: 1px solid #333; border-radius: 12px; padding: 25px; margin-bottom: 25px; }
-        .trade-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
-        .trade-card { background: #1a1a1a; border: 2px solid #333; border-radius: 10px; padding: 20px; position: relative; overflow: hidden; cursor: pointer; transition: all 0.3s ease; }
-        .trade-card:hover { border-color: #00ff88; box-shadow: 0 5px 20px rgba(0, 255, 136, 0.2); transform: translateY(-2px); }
-        .trade-card.bullish { border-left: 4px solid #00ff88; }
-        .trade-card.bearish { border-left: 4px solid #ff4444; }
-        .trade-card.bearish:hover { border-color: #ff4444; box-shadow: 0 5px 20px rgba(255, 68, 68, 0.2); }
+        .trade-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; }
+        .trade-card { background: #111; border: 2px solid #333; border-radius: 12px; overflow: hidden; position: relative; transition: all 0.3s ease; }
+        .trade-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3); }
+        .trade-card.consensus-bullish { border-left: 4px solid #00ff88; }
+        .trade-card.consensus-bearish { border-left: 4px solid #ff4444; }
+        .trade-card.consensus-mixed { border-left: 4px solid #ffaa00; }
         .click-hint { position: absolute; bottom: 10px; right: 15px; color: #666; font-size: 11px; opacity: 0; transition: opacity 0.3s ease; }
         .trade-card:hover .click-hint { opacity: 1; }
+
+        /* Enhanced Card Header */
+        .card-header { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px; border-bottom: 1px solid #333; }
+        .ticker-main-info { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
+        .ticker-symbol { font-size: 24px; font-weight: 700; color: #fff; }
+        .current-price { font-size: 16px; color: #888; margin-top: 2px; }
+        .consensus-indicator { text-align: right; }
+        .confluence-status { display: block; font-size: 10px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+        .confluence-status.aligned { color: #00ff88; }
+        .confluence-status.divergent { color: #ff4444; }
+        .confluence-status.partial { color: #ffaa00; }
+        .dominant-direction { font-size: 12px; font-weight: 600; text-transform: uppercase; }
+        .dominant-direction.bullish { color: #00ff88; }
+        .dominant-direction.bearish { color: #ff4444; }
+        .dominant-direction.mixed { color: #ffaa00; }
+
+        /* Enhanced Timeframe Tabs */
+        .card-timeframe-tabs { display: flex; background: #0a0a0a; border-radius: 8px; overflow: hidden; border: 1px solid #333; }
+        .card-tab { flex: 1; padding: 10px 8px; text-align: center; cursor: pointer; transition: all 0.3s ease; position: relative; border-right: 1px solid #333; }
+        .card-tab:last-child { border-right: none; }
+        .card-tab.active { background: #00ff88; color: #000; }
+        .card-tab:not(.active) { color: #888; background: #0a0a0a; }
+        .card-tab:not(.active):hover { background: #222; color: #fff; }
+        .card-tab.high-confidence:not(.active) { border-bottom: 2px solid #00ff88; }
+        .card-tab.medium-confidence:not(.active) { border-bottom: 2px solid #ffaa00; }
+        .card-tab.low-confidence:not(.active) { border-bottom: 2px solid #ff4444; }
+        .card-tab.conflicting { position: relative; }
+        .conflict-indicator { position: absolute; top: 2px; right: 2px; font-size: 8px; opacity: 0.8; }
+        .dte-label { display: block; font-size: 11px; font-weight: 600; }
+        .confidence-mini { display: block; font-size: 9px; opacity: 0.8; font-weight: 500; }
+
+        /* Timeframe Content */
+        .timeframe-content { padding: 20px; }
+        .timeframe-panel { display: none; }
+        .timeframe-panel.active { display: block; }
+        .timeframe-analysis { font-size: 12px; color: #ccc; line-height: 1.4; margin-top: 10px; }
+
+        /* Confidence Evolution */
+        .confidence-evolution { padding: 15px 20px; border-top: 1px solid #333; background: #0a0a0a; }
+        .evolution-label { font-size: 11px; color: #888; margin-bottom: 8px; text-transform: uppercase; }
+        .confidence-timeline { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .timeline-point { width: 8px; height: 8px; border-radius: 50%; }
+        .timeline-point.high { background: #00ff88; }
+        .timeline-point.medium { background: #ffaa00; }
+        .timeline-point.low { background: #ff4444; }
+        .timeline-line { flex: 1; height: 2px; background: #333; }
+        .timeline-labels { display: flex; justify-content: space-between; }
+        .timeline-label { font-size: 10px; color: #888; }
 
         .trade-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
         .ticker { font-size: 24px; font-weight: 700; color: #fff; }
@@ -1250,161 +1442,164 @@ class HTMLGenerator:
         </div>
         
         <div class="conviction-section">
-            <div class="section-title">🎯 High Conviction Trades</div>
+            <div class="section-title">
+                🎯 High Conviction Trades
+                <span style="background: #00ff88; color: #000; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-left: 15px;">MULTI-TIMEFRAME</span>
+            </div>
             <div class="trade-cards">
-                {% for trade in high_conviction_trades %}
-                <div class="trade-card {{trade.direction}}" onclick="openInteractiveAnalysis('{{trade.ticker}}', '{{trade.direction}}')">
+                {% for trade in consolidated_high_conviction_trades %}
+                <div class="trade-card consensus-{{trade.consensus_direction}}"
+                     data-ticker="{{trade.ticker}}"
+                     onclick="openInteractiveAnalysis('{{trade.ticker}}', '{{trade.consensus_direction}}')">
                     <div class="click-hint">Click for interactive session</div>
-                    <div class="trade-header">
-                        <div class="ticker">{{trade.ticker}} <span style="font-size: 16px; color: #888; font-weight: 400;">${{trade.current_price}}</span></div>
-                        <div class="confidence-badge {% if trade.direction == 'bearish' %}bearish{% endif %}">{{trade.confidence}} CONFIDENCE</div>
-                    </div>
-                    <div class="pattern-type {% if trade.direction == 'bearish' %}bearish{% endif %}">{{trade.pattern_type}}</div>
-                    <div class="trade-details">
-                        <div class="trade-row">
-                            <span class="trade-label">Entry:</span>
-                            <span class="trade-value">{{trade.entry}}</span>
+
+                    <!-- Enhanced Card Header -->
+                    <div class="card-header">
+                        <div class="ticker-main-info">
+                            <div>
+                                <div class="ticker-symbol">{{trade.ticker}}</div>
+                                <div class="current-price">${{trade.current_price}}</div>
+                            </div>
+                            <div class="consensus-indicator">
+                                <span class="confluence-status {{trade.confluence_status}}">
+                                    {% if trade.confluence_status == 'aligned' %}✅ ALIGNED
+                                    {% elif trade.confluence_status == 'divergent' %}⚠️ DIVERGENT
+                                    {% else %}⚡ PARTIAL{% endif %}
+                                </span>
+                                <span class="dominant-direction {{trade.consensus_direction}}">
+                                    {{trade.consensus_direction|upper}} CONSENSUS
+                                </span>
+                            </div>
                         </div>
-                        <div class="trade-row">
-                            <span class="trade-label">Target:</span>
-                            <span class="trade-value">{{trade.target}}</span>
-                        </div>
-                        <div class="trade-row">
-                            <span class="trade-label">Stop Loss:</span>
-                            <span class="trade-value">{{trade.stop_loss}}</span>
-                        </div>
-                        <div class="trade-row">
-                            <span class="trade-label">Risk/Reward:</span>
-                            <span class="trade-value">{{trade.risk_reward}}</span>
-                        </div>
-                        <div class="trade-row">
-                            <span class="trade-label">Expiry:</span>
-                            <span class="trade-value">{{trade.expiry}} ({{trade.dte}} DTE)</span>
-                        </div>
-                        <div class="trade-row">
-                            <span class="trade-label">Success Probability:</span>
-                            <span class="trade-value {% if trade.direction == 'bullish' %}positive{% else %}negative{% endif %}">{{trade.success_prob}}</span>
-                        </div>
-                        <div class="trade-row">
-                            <span class="trade-label">Timeframe Confluence:</span>
-                            <span class="trade-value">{{trade.timeframe_confluence}}</span>
-                        </div>
-                        <div class="trade-row">
-                            <span class="trade-label">Volatility Regime:</span>
-                            <span class="trade-value">{{trade.volatility_regime}}</span>
-                        </div>
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Smart Money Analysis:</div>
-                        <div style="font-size: 12px; color: #ccc; margin-bottom: 8px;">{{trade.institutional_flow}}</div>
-                        <div style="font-size: 11px; color: #aaa;">{{trade.smart_money_thesis}}</div>
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Entry Triggers:</div>
-                        <div style="font-size: 12px; color: #ccc;">
-                            {% for trigger in trade.entry_triggers %}
-                            <span style="background: #333; padding: 2px 8px; border-radius: 4px; margin-right: 8px; margin-bottom: 4px; display: inline-block;">{{trigger}}</span>
+
+                        <!-- Dynamic Timeframe Tabs -->
+                        <div class="card-timeframe-tabs">
+                            {% for dte, data in trade.timeframes.items() %}
+                            <div class="card-tab {% if loop.first %}active{% endif %}
+                                      {% if data.confidence|replace('%', '')|int >= 75 %}high-confidence
+                                      {% elif data.confidence|replace('%', '')|int >= 50 %}medium-confidence
+                                      {% else %}low-confidence{% endif %}
+                                      {% if data.direction != trade.consensus_direction %}conflicting{% endif %}"
+                                 data-dte="{{dte}}"
+                                 onclick="event.stopPropagation(); switchConsolidatedTab('{{trade.ticker}}', '{{dte}}');">
+                                <span class="dte-label">{{dte}}D</span>
+                                <span class="confidence-mini">{{data.confidence}}</span>
+                                {% if data.direction != trade.consensus_direction %}
+                                <span class="conflict-indicator">⚠️</span>
+                                {% endif %}
+                            </div>
                             {% endfor %}
                         </div>
                     </div>
-                    <div style="margin-bottom: 15px;">
-                        <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Key Levels:</div>
-                        <div style="font-size: 12px; color: #ccc;">
-                            <span style="background: #1a4d1a; padding: 2px 8px; border-radius: 4px; margin-right: 8px;">Support: {{trade.technical_levels.support}}</span>
-                            <span style="background: #4d1a1a; padding: 2px 8px; border-radius: 4px; margin-right: 8px;">Resistance: {{trade.technical_levels.resistance}}</span>
-                            <span style="background: #4d4d1a; padding: 2px 8px; border-radius: 4px;">Pivot: {{trade.technical_levels.pivot}}</span>
+
+                    <!-- Timeframe Content Panels -->
+                    <div class="timeframe-content">
+                        {% for dte, data in trade.timeframes.items() %}
+                        <div class="timeframe-panel {% if loop.first %}active{% endif %}"
+                             id="{{trade.ticker}}-{{dte}}">
+
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <div class="pattern-type {{data.direction}}">{{data.pattern_type}}</div>
+                                <div class="confidence-badge {% if data.direction == 'bearish' %}bearish{% endif %}">
+                                    {{data.confidence}} CONFIDENCE
+                                </div>
+                            </div>
+
+                            <div class="trade-details">
+                                <div class="trade-row">
+                                    <span class="trade-label">Strategy:</span>
+                                    <span class="trade-value">{{data.direction|title}}</span>
+                                </div>
+                                <div class="trade-row">
+                                    <span class="trade-label">Entry:</span>
+                                    <span class="trade-value">{{data.entry}}</span>
+                                </div>
+                                <div class="trade-row">
+                                    <span class="trade-label">Target:</span>
+                                    <span class="trade-value">{{data.target}}</span>
+                                </div>
+                                <div class="trade-row">
+                                    <span class="trade-label">Stop Loss:</span>
+                                    <span class="trade-value">{{data.stop_loss}}</span>
+                                </div>
+                                <div class="trade-row">
+                                    <span class="trade-label">Risk/Reward:</span>
+                                    <span class="trade-value">{{data.risk_reward}}</span>
+                                </div>
+                                <div class="trade-row">
+                                    <span class="trade-label">Success Prob:</span>
+                                    <span class="trade-value">{{data.success_prob}}</span>
+                                </div>
+                                <div class="trade-row">
+                                    <span class="trade-label">Expiry:</span>
+                                    <span class="trade-value">{{data.expiry}} ({{data.dte}} DTE)</span>
+                                </div>
+                            </div>
+
+                            <div class="timeframe-analysis">
+                                <strong>{{dte}}D Analysis:</strong> {{data.analysis}}
+                            </div>
+
+                            {% if data.supporting_evidence %}
+                            <div style="margin-top: 15px;">
+                                <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Supporting Evidence:</div>
+                                <ul class="evidence-list">
+                                    {% for evidence in data.supporting_evidence %}
+                                    <li>{{evidence}}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                            {% if data.smart_money_insights %}
+                            <div style="background: #1a1a1a; border: 1px solid #444; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                                <div style="font-size: 12px; color: #00ff88; margin-bottom: 12px; text-transform: uppercase; font-weight: 600;">🎯 Smart Money Intelligence</div>
+
+                                {% if data.smart_money_insights.oi_concentration_zones %}
+                                <div style="margin-bottom: 12px;">
+                                    <div style="font-size: 11px; color: #888; margin-bottom: 6px;">OI CONCENTRATION:</div>
+                                    {% if data.smart_money_insights.oi_concentration_zones.heavy_call_strikes %}
+                                    <div style="margin-bottom: 8px;">
+                                        <span style="font-size: 10px; color: #00ff88; font-weight: 500;">Calls:</span>
+                                        {% for strike in data.smart_money_insights.oi_concentration_zones.heavy_call_strikes %}
+                                        <span style="background: #004422; padding: 2px 6px; border-radius: 3px; margin-left: 4px; font-size: 10px;">{{strike.strike}}</span>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                    {% if data.smart_money_insights.oi_concentration_zones.heavy_put_strikes %}
+                                    <div>
+                                        <span style="font-size: 10px; color: #ff4444; font-weight: 500;">Puts:</span>
+                                        {% for strike in data.smart_money_insights.oi_concentration_zones.heavy_put_strikes %}
+                                        <span style="background: #442222; padding: 2px 6px; border-radius: 3px; margin-left: 4px; font-size: 10px;">{{strike.strike}}</span>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
                         </div>
+                        {% endfor %}
                     </div>
-                    <div style="margin-bottom: 15px;">
-                        <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Supporting Evidence:</div>
-                        <ul class="evidence-list">
-                            {% for evidence in trade.supporting_evidence %}
-                            <li>{{evidence}}</li>
+
+                    <!-- Confidence Evolution Timeline -->
+                    <div class="confidence-evolution">
+                        <div class="evolution-label">CONFIDENCE EVOLUTION</div>
+                        <div class="confidence-timeline">
+                            {% for dte, data in trade.timeframes.items() %}
+                            <div class="timeline-point
+                                      {% if data.confidence|replace('%', '')|int >= 75 %}high
+                                      {% elif data.confidence|replace('%', '')|int >= 50 %}medium
+                                      {% else %}low{% endif %}"></div>
+                            {% if not loop.last %}<div class="timeline-line"></div>{% endif %}
                             {% endfor %}
-                        </ul>
+                        </div>
+                        <div class="timeline-labels">
+                            {% for dte, data in trade.timeframes.items() %}
+                            <span class="timeline-label">{{dte}}D: {{data.confidence}}</span>
+                            {% endfor %}
+                        </div>
                     </div>
-                    {% if trade.smart_money_insights %}
-                    <div class="smart-money-section" style="background: #1a1a1a; border: 1px solid #444; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                        <div style="font-size: 12px; color: #00ff88; margin-bottom: 12px; text-transform: uppercase; font-weight: 600;">🎯 Smart Money Intelligence</div>
-                        
-                        {% if trade.smart_money_insights.oi_concentration_zones %}
-                        <div style="margin-bottom: 12px;">
-                            <div style="font-size: 11px; color: #888; margin-bottom: 6px;">OI CONCENTRATION ANALYSIS:</div>
-                            <div style="font-size: 11px; color: #ddd;">{{trade.smart_money_insights.oi_concentration_zones.concentration_analysis}}</div>
-                            {% if trade.smart_money_insights.oi_concentration_zones.heavy_call_strikes %}
-                            <div style="margin-top: 8px;">
-                                <span style="font-size: 10px; color: #00ff88; font-weight: 500;">Heavy Call Strikes:</span>
-                                {% for strike in trade.smart_money_insights.oi_concentration_zones.heavy_call_strikes %}
-                                <span style="background: #004422; padding: 2px 6px; border-radius: 3px; margin-left: 4px; font-size: 10px;">{{strike.strike}} ({{strike.oi}})</span>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                            {% if trade.smart_money_insights.oi_concentration_zones.heavy_put_strikes %}
-                            <div style="margin-top: 8px;">
-                                <span style="font-size: 10px; color: #ff4444; font-weight: 500;">Heavy Put Strikes:</span>
-                                {% for strike in trade.smart_money_insights.oi_concentration_zones.heavy_put_strikes %}
-                                <span style="background: #442222; padding: 2px 6px; border-radius: 3px; margin-left: 4px; font-size: 10px;">{{strike.strike}} ({{strike.oi}})</span>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                        
-                        {% if trade.smart_money_insights.flow_analysis %}
-                        <div style="margin-bottom: 12px;">
-                            <div style="font-size: 11px; color: #888; margin-bottom: 6px;">FLOW ANALYSIS:</div>
-                            <div style="font-size: 11px; color: #ddd;">{{trade.smart_money_insights.flow_analysis.net_positioning}}</div>
-                            {% if trade.smart_money_insights.flow_analysis.large_blocks %}
-                            <div style="margin-top: 4px;">
-                                {% for block in trade.smart_money_insights.flow_analysis.large_blocks %}
-                                <div style="font-size: 10px; color: #ccc;">• {{block}}</div>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                        
-                        {% if trade.smart_money_insights.put_call_dynamics %}
-                        <div style="margin-bottom: 12px;">
-                            <div style="font-size: 11px; color: #888; margin-bottom: 6px;">PUT/CALL DYNAMICS:</div>
-                            <div style="font-size: 11px; color: #ddd;">
-                                <span style="color: #ffaa00;">Ratio: {{trade.smart_money_insights.put_call_dynamics.ratio}}</span>
-                                <span style="margin-left: 15px; color: #00ff88;">Change: {{trade.smart_money_insights.put_call_dynamics.change}}</span>
-                            </div>
-                            <div style="font-size: 10px; color: #ccc; margin-top: 4px;">{{trade.smart_money_insights.put_call_dynamics.smart_money_view}}</div>
-                        </div>
-                        {% endif %}
-                        
-                        {% if trade.smart_money_insights.max_pain_analysis %}
-                        <div style="margin-bottom: 12px;">
-                            <div style="font-size: 11px; color: #888; margin-bottom: 6px;">MAX PAIN ANALYSIS:</div>
-                            <div style="font-size: 11px; color: #ddd;">
-                                <span style="color: #ffaa00;">Level: ${{trade.smart_money_insights.max_pain_analysis.level}}</span>
-                                <span style="margin-left: 15px; color: #ff4444;">Pin Risk: {{trade.smart_money_insights.max_pain_analysis.pin_risk}}</span>
-                            </div>
-                            <div style="font-size: 10px; color: #ccc; margin-top: 4px;">{{trade.smart_money_insights.max_pain_analysis.dealer_impact}}</div>
-                        </div>
-                        {% endif %}
-                        
-                        {% if trade.smart_money_insights.gamma_analysis %}
-                        <div style="margin-bottom: 8px;">
-                            <div style="font-size: 11px; color: #888; margin-bottom: 6px;">GAMMA EXPOSURE:</div>
-                            <div style="font-size: 11px; color: #ddd;">
-                                <span style="color: #00ff88;">{{trade.smart_money_insights.gamma_analysis.net_exposure}}</span>
-                                <span style="margin-left: 15px; color: #ffaa00;">Squeeze Risk: {{trade.smart_money_insights.gamma_analysis.squeeze_risk}}</span>
-                            </div>
-                            {% if trade.smart_money_insights.gamma_analysis.flip_point %}
-                            <div style="margin-top: 6px; font-size: 10px; color: #ccc;">
-                                <span style="color: #888;">Gamma Flip:</span> 
-                                <span style="color: #ffaa00; font-weight: 500;">${{trade.smart_money_insights.gamma_analysis.flip_point}}</span>
-                                <span style="margin-left: 10px; color: #888;">Impact:</span>
-                                <span style="color: #ccc;">{{trade.smart_money_insights.gamma_analysis.volatility_impact}}</span>
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
@@ -1489,7 +1684,27 @@ class HTMLGenerator:
                 card.style.opacity = '1';
             });
         }
-        
+
+        function switchConsolidatedTab(ticker, dte) {
+            // Find all tabs and panels for this ticker
+            const card = document.querySelector(`[data-ticker="${ticker}"]`);
+            if (!card) return;
+
+            const tabs = card.querySelectorAll('.card-tab');
+            const panels = card.querySelectorAll('.timeframe-panel');
+
+            // Remove active class from all tabs and panels
+            tabs.forEach(tab => tab.classList.remove('active'));
+            panels.forEach(panel => panel.classList.remove('active'));
+
+            // Add active class to selected tab and panel
+            const selectedTab = card.querySelector(`[data-dte="${dte}"]`);
+            const selectedPanel = card.querySelector(`#${ticker}-${dte}`);
+
+            if (selectedTab) selectedTab.classList.add('active');
+            if (selectedPanel) selectedPanel.classList.add('active');
+        }
+
         // Add startup notification
         document.addEventListener('DOMContentLoaded', function() {
             // Check if interactive service is running
