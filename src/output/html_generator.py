@@ -674,7 +674,7 @@ class HTMLGenerator:
                     "stop_loss": trade["stop_loss"],
                     "success_prob": trade["success_probability"],
                     "risk_reward": trade["risk_reward"],
-                    "analysis": trade.get("institutional_flow", "Smart money positioning detected"),
+                    "analysis": trade.get("smart_money_thesis", trade.get("institutional_flow", "Smart money positioning detected")),
                     "expiry": trade.get("expiry", ""),
                     "dte": dte,
                     "supporting_evidence": trade.get("supporting_evidence", [])[:3],  # Top 3 evidence points
