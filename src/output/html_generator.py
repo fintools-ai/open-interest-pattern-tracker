@@ -6,7 +6,7 @@ Uses Jinja2 templates to generate professional trading dashboards
 import os
 import json
 from datetime import datetime
-from jinja2 import Template
+from jinja2 import Template, Environment
 
 def safe_int(value):
     """Safely convert any value to integer, handling strings, percentages, quotes"""
@@ -32,6 +32,19 @@ def safe_float(value, decimals=2):
         return f"{result:.{decimals}f}"
     except (ValueError, TypeError):
         return "0.00"
+
+def number_format(value):
+    """Format numbers with commas for thousands (e.g., 10000 -> 10,000)"""
+    try:
+        # Handle string numbers and clean them
+        if isinstance(value, str):
+            clean_value = value.replace(',', '').strip()
+            num = int(float(clean_value))
+        else:
+            num = int(value)
+        return f"{num:,}"
+    except (ValueError, TypeError):
+        return str(value) if value is not None else "0"
 
 class HTMLGenerator:
     def __init__(self, template_dir="src/output/templates", output_dir="output"):
@@ -1536,10 +1549,130 @@ class HTMLGenerator:
                                 </div>
                             </div>
 
-                            <!-- LLM Analysis - Main narrative -->
+                            <!-- Complete LLM Analysis -->
                             <div style="background: #0a0a0a; border: 1px solid #333; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                                <div style="font-size: 12px; color: #00ff88; margin-bottom: 10px; text-transform: uppercase; font-weight: 600;">🧠 LLM Analysis ({{dte}}D Timeframe)</div>
-                                <div style="font-size: 13px; color: #e0e0e0; line-height: 1.5;">{{data.analysis}}</div>
+                                <div style="font-size: 12px; color: #00ff88; margin-bottom: 15px; text-transform: uppercase; font-weight: 600;">🧠 Complete LLM Analysis ({{dte}}D Timeframe)</div>
+
+                                <!-- Market Summary -->
+                                {% if data.market_summary %}
+                                <div style="margin-bottom: 15px;">
+                                    <div style="font-size: 11px; color: #ffaa00; margin-bottom: 8px; text-transform: uppercase; font-weight: 600;">📊 Market Summary:</div>
+                                    <div style="font-size: 12px; color: #e0e0e0; line-height: 1.4; background: #111; padding: 10px; border-radius: 5px;">{{data.market_summary}}</div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Pattern Analysis -->
+                                {% if data.pattern_analysis %}
+                                <div style="margin-bottom: 15px;">
+                                    <div style="font-size: 11px; color: #ffaa00; margin-bottom: 8px; text-transform: uppercase; font-weight: 600;">🔍 Pattern Analysis:</div>
+                                    <div style="background: #111; padding: 10px; border-radius: 5px;">
+                                        {% if data.pattern_analysis.pattern_strength %}
+                                        <div style="font-size: 11px; color: #ccc; margin-bottom: 6px;"><strong>Strength:</strong> {{data.pattern_analysis.pattern_strength|title}}</div>
+                                        {% endif %}
+                                        {% if data.pattern_analysis.confidence_score %}
+                                        <div style="font-size: 11px; color: #ccc; margin-bottom: 6px;"><strong>Confidence:</strong> {{data.pattern_analysis.confidence_score}}</div>
+                                        {% endif %}
+                                        {% if data.pattern_analysis.oi_intelligence %}
+                                        <div style="font-size: 11px; color: #00ff88; margin-bottom: 6px;"><strong>OI Intelligence:</strong></div>
+                                        {% if data.pattern_analysis.oi_intelligence.strike_concentration %}
+                                        <div style="font-size: 10px; color: #ccc; margin-left: 10px; margin-bottom: 4px;">• Strike Concentration: {{data.pattern_analysis.oi_intelligence.strike_concentration}}</div>
+                                        {% endif %}
+                                        {% if data.pattern_analysis.oi_intelligence.flow_direction %}
+                                        <div style="font-size: 10px; color: #ccc; margin-left: 10px; margin-bottom: 4px;">• Flow Direction: {{data.pattern_analysis.oi_intelligence.flow_direction}}</div>
+                                        {% endif %}
+                                        {% if data.pattern_analysis.oi_intelligence.position_type %}
+                                        <div style="font-size: 10px; color: #ccc; margin-left: 10px; margin-bottom: 4px;">• Position Type: {{data.pattern_analysis.oi_intelligence.position_type}}</div>
+                                        {% endif %}
+                                        {% if data.pattern_analysis.oi_intelligence.size_significance %}
+                                        <div style="font-size: 10px; color: #ccc; margin-left: 10px;">• Size Significance: {{data.pattern_analysis.oi_intelligence.size_significance}}</div>
+                                        {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Trade Recommendation Details -->
+                                {% if data.trade_recommendation %}
+                                <div style="margin-bottom: 15px;">
+                                    <div style="font-size: 11px; color: #ffaa00; margin-bottom: 8px; text-transform: uppercase; font-weight: 600;">💡 Trade Recommendation:</div>
+                                    <div style="background: #111; padding: 10px; border-radius: 5px;">
+                                        {% if data.trade_recommendation.specific_entry %}
+                                        <div style="font-size: 11px; color: #00ff88; margin-bottom: 6px;"><strong>Entry Strategy:</strong> {{data.trade_recommendation.specific_entry}}</div>
+                                        {% endif %}
+                                        {% if data.trade_recommendation.timeframe_confluence %}
+                                        <div style="font-size: 11px; color: #ccc; margin-bottom: 6px;"><strong>Timeframe Confluence:</strong> {{data.trade_recommendation.timeframe_confluence}}</div>
+                                        {% endif %}
+                                        {% if data.trade_recommendation.exit_strategy %}
+                                        <div style="font-size: 11px; color: #ccc; margin-bottom: 6px;"><strong>Exit Strategy:</strong> {{data.trade_recommendation.exit_strategy}}</div>
+                                        {% endif %}
+                                        {% if data.trade_recommendation.entry_triggers %}
+                                        <div style="font-size: 11px; color: #00ff88; margin-bottom: 6px;"><strong>Entry Triggers:</strong></div>
+                                        {% for trigger in data.trade_recommendation.entry_triggers %}
+                                        <div style="font-size: 10px; color: #ccc; margin-left: 10px;">• {{trigger}}</div>
+                                        {% endfor %}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Risk Management -->
+                                {% if data.risk_management %}
+                                <div style="margin-bottom: 15px;">
+                                    <div style="font-size: 11px; color: #ff4444; margin-bottom: 8px; text-transform: uppercase; font-weight: 600;">⚠️ Risk Management:</div>
+                                    <div style="background: #111; padding: 10px; border-radius: 5px;">
+                                        {% if data.risk_management.primary_risks %}
+                                        <div style="font-size: 11px; color: #ff4444; margin-bottom: 6px;"><strong>Primary Risks:</strong></div>
+                                        {% for risk in data.risk_management.primary_risks %}
+                                        <div style="font-size: 10px; color: #ccc; margin-left: 10px;">• {{risk}}</div>
+                                        {% endfor %}
+                                        {% endif %}
+                                        {% if data.risk_management.hedge_strategy %}
+                                        <div style="font-size: 11px; color: #ccc; margin-top: 6px;"><strong>Hedge Strategy:</strong> {{data.risk_management.hedge_strategy}}</div>
+                                        {% endif %}
+                                        {% if data.risk_management.volatility_considerations %}
+                                        <div style="font-size: 11px; color: #ccc; margin-top: 6px;"><strong>Volatility:</strong> {{data.risk_management.volatility_considerations}}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Technical Analysis -->
+                                {% if data.technical_analysis %}
+                                <div style="margin-bottom: 15px;">
+                                    <div style="font-size: 11px; color: #8a2be2; margin-bottom: 8px; text-transform: uppercase; font-weight: 600;">📈 Technical Analysis:</div>
+                                    <div style="background: #111; padding: 10px; border-radius: 5px;">
+                                        {% if data.technical_analysis.multi_timeframe_summary %}
+                                        <div style="font-size: 11px; color: #ccc; margin-bottom: 6px;"><strong>Multi-Timeframe:</strong> {{data.technical_analysis.multi_timeframe_summary}}</div>
+                                        {% endif %}
+                                        {% if data.technical_analysis.key_levels %}
+                                        <div style="font-size: 11px; color: #8a2be2; margin-bottom: 6px;"><strong>Key Levels:</strong></div>
+                                        {% if data.technical_analysis.key_levels.support %}
+                                        <div style="font-size: 10px; color: #ccc; margin-left: 10px;">• Support: {{data.technical_analysis.key_levels.support}}</div>
+                                        {% endif %}
+                                        {% if data.technical_analysis.key_levels.resistance %}
+                                        <div style="font-size: 10px; color: #ccc; margin-left: 10px;">• Resistance: {{data.technical_analysis.key_levels.resistance}}</div>
+                                        {% endif %}
+                                        {% if data.technical_analysis.key_levels.pivot %}
+                                        <div style="font-size: 10px; color: #ccc; margin-left: 10px;">• Pivot: {{data.technical_analysis.key_levels.pivot}}</div>
+                                        {% endif %}
+                                        {% endif %}
+                                        {% if data.technical_analysis.momentum_indicators %}
+                                        <div style="font-size: 11px; color: #ccc; margin-top: 6px;"><strong>Momentum:</strong> {{data.technical_analysis.momentum_indicators}}</div>
+                                        {% endif %}
+                                        {% if data.technical_analysis.volume_analysis %}
+                                        <div style="font-size: 11px; color: #ccc; margin-top: 6px;"><strong>Volume:</strong> {{data.technical_analysis.volume_analysis}}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Smart Money Thesis (Summary) -->
+                                {% if data.analysis %}
+                                <div style="margin-bottom: 0;">
+                                    <div style="font-size: 11px; color: #00ff88; margin-bottom: 8px; text-transform: uppercase; font-weight: 600;">💎 Smart Money Thesis:</div>
+                                    <div style="font-size: 12px; color: #e0e0e0; line-height: 1.5; background: #111; padding: 10px; border-radius: 5px; border-left: 3px solid #00ff88;">{{data.analysis}}</div>
+                                </div>
+                                {% endif %}
                             </div>
 
                             {% if data.supporting_evidence %}
@@ -1570,15 +1703,51 @@ class HTMLGenerator:
                                 </div>
                                 {% endif %}
 
-                                <!-- Flow Analysis -->
+                                <!-- Enhanced Flow Analysis with Large Blocks & Unusual Activity -->
                                 {% if data.smart_money_insights.flow_analysis %}
                                 <div style="margin-bottom: 12px;">
-                                    <div style="font-size: 11px; color: #888; margin-bottom: 6px;">INSTITUTIONAL FLOW:</div>
-                                    {% if data.smart_money_insights.flow_analysis.directional_bias %}
-                                    <div style="font-size: 10px; color: #00ff88; margin-bottom: 4px;">{{data.smart_money_insights.flow_analysis.directional_bias}}</div>
+                                    <div style="font-size: 11px; color: #888; margin-bottom: 8px;">INSTITUTIONAL FLOW INTELLIGENCE:</div>
+
+                                    <!-- Directional Bias & Net Positioning -->
+                                    <div style="background: #111; border-radius: 5px; padding: 8px; margin-bottom: 8px;">
+                                        {% if data.smart_money_insights.flow_analysis.directional_bias %}
+                                        <div style="font-size: 10px; color: #00ff88; margin-bottom: 4px;"><strong>Direction:</strong> {{data.smart_money_insights.flow_analysis.directional_bias}}</div>
+                                        {% endif %}
+                                        {% if data.smart_money_insights.flow_analysis.net_positioning %}
+                                        <div style="font-size: 10px; color: #ccc;"><strong>Positioning:</strong> {{data.smart_money_insights.flow_analysis.net_positioning}}</div>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Large Block Activity -->
+                                    {% if data.smart_money_insights.flow_analysis.large_blocks %}
+                                    <div style="margin-bottom: 8px;">
+                                        <div style="font-size: 9px; color: #ffaa00; font-weight: 600; margin-bottom: 4px;">📊 LARGE BLOCK ACTIVITY:</div>
+                                        {% for block in data.smart_money_insights.flow_analysis.large_blocks %}
+                                        <div style="background: rgba(255,170,0,0.1); border: 1px solid #ffaa00; border-radius: 4px; padding: 6px; margin-bottom: 4px;">
+                                            <div style="font-size: 9px; color: #ccc;">{{block}}</div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
                                     {% endif %}
-                                    {% if data.smart_money_insights.flow_analysis.net_positioning %}
-                                    <div style="font-size: 10px; color: #ccc;">{{data.smart_money_insights.flow_analysis.net_positioning}}</div>
+
+                                    <!-- Unusual Activity Detection -->
+                                    {% if data.smart_money_insights.flow_analysis.unusual_activity %}
+                                    <div style="margin-bottom: 8px;">
+                                        <div style="font-size: 9px; color: #ff4444; font-weight: 600; margin-bottom: 4px;">🚨 UNUSUAL ACTIVITY:</div>
+                                        {% for activity in data.smart_money_insights.flow_analysis.unusual_activity %}
+                                        <div style="background: rgba(255,68,68,0.1); border: 1px solid #ff4444; border-radius: 4px; padding: 6px; margin-bottom: 4px;">
+                                            <div style="font-size: 9px; color: #ccc;">{{activity}}</div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+
+                                    <!-- Dark Pool Signals -->
+                                    {% if data.smart_money_insights.flow_analysis.dark_pool_signals %}
+                                    <div style="background: #0a0a0a; border-left: 3px solid #8a2be2; padding: 8px;">
+                                        <div style="font-size: 9px; color: #8a2be2; font-weight: 600; margin-bottom: 4px;">🌑 DARK POOL SIGNALS:</div>
+                                        <div style="font-size: 9px; color: #ccc; line-height: 1.3;">{{data.smart_money_insights.flow_analysis.dark_pool_signals}}</div>
+                                    </div>
                                     {% endif %}
                                 </div>
                                 {% endif %}
@@ -1613,24 +1782,88 @@ class HTMLGenerator:
                                 </div>
                                 {% endif %}
 
-                                <!-- OI Concentration -->
+                                <!-- Enhanced OI Concentration with Complete Cluster Data -->
                                 {% if data.smart_money_insights.oi_concentration_zones %}
                                 <div style="margin-bottom: 12px;">
-                                    <div style="font-size: 11px; color: #888; margin-bottom: 6px;">OI CONCENTRATION:</div>
+                                    <div style="font-size: 11px; color: #888; margin-bottom: 8px;">OI CONCENTRATION CLUSTERS:</div>
+
+                                    <!-- Heavy Call Strikes with Full Details -->
                                     {% if data.smart_money_insights.oi_concentration_zones.heavy_call_strikes %}
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 10px; color: #00ff88; font-weight: 500;">Calls:</span>
+                                    <div style="margin-bottom: 10px;">
+                                        <div style="font-size: 10px; color: #00ff88; font-weight: 600; margin-bottom: 6px;">🟢 CALL CLUSTERS:</div>
                                         {% for strike in data.smart_money_insights.oi_concentration_zones.heavy_call_strikes %}
-                                        <span style="background: #004422; padding: 2px 6px; border-radius: 3px; margin-left: 4px; font-size: 10px;">{{strike.strike}}</span>
+                                        <div style="background: #004422; border: 1px solid #00ff88; border-radius: 6px; padding: 8px; margin-bottom: 6px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <span style="font-size: 11px; color: #00ff88; font-weight: 600;">${{strike.strike}}</span>
+                                                {% if strike.oi %}
+                                                <span style="font-size: 10px; color: #fff; font-weight: 500;">{{strike.oi|number_format}} OI</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if strike.interpretation %}
+                                            <div style="font-size: 9px; color: #ccc; margin-bottom: 3px;">{{strike.interpretation}}</div>
+                                            {% endif %}
+                                            <div style="display: flex; gap: 8px;">
+                                                {% if strike.distance_from_price %}
+                                                <span style="font-size: 8px; color: #ffaa00; background: rgba(255,170,0,0.2); padding: 2px 4px; border-radius: 3px;">{{strike.distance_from_price}}</span>
+                                                {% endif %}
+                                                {% if strike.call_wall_strength %}
+                                                <span style="font-size: 8px; color: #00ff88; background: rgba(0,255,136,0.2); padding: 2px 4px; border-radius: 3px;">{{strike.call_wall_strength}} Wall</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                         {% endfor %}
                                     </div>
                                     {% endif %}
+
+                                    <!-- Heavy Put Strikes with Full Details -->
                                     {% if data.smart_money_insights.oi_concentration_zones.heavy_put_strikes %}
-                                    <div>
-                                        <span style="font-size: 10px; color: #ff4444; font-weight: 500;">Puts:</span>
+                                    <div style="margin-bottom: 10px;">
+                                        <div style="font-size: 10px; color: #ff4444; font-weight: 600; margin-bottom: 6px;">🔴 PUT CLUSTERS:</div>
                                         {% for strike in data.smart_money_insights.oi_concentration_zones.heavy_put_strikes %}
-                                        <span style="background: #442222; padding: 2px 6px; border-radius: 3px; margin-left: 4px; font-size: 10px;">{{strike.strike}}</span>
+                                        <div style="background: #442222; border: 1px solid #ff4444; border-radius: 6px; padding: 8px; margin-bottom: 6px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <span style="font-size: 11px; color: #ff4444; font-weight: 600;">${{strike.strike}}</span>
+                                                {% if strike.oi %}
+                                                <span style="font-size: 10px; color: #fff; font-weight: 500;">{{strike.oi|number_format}} OI</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if strike.interpretation %}
+                                            <div style="font-size: 9px; color: #ccc; margin-bottom: 3px;">{{strike.interpretation}}</div>
+                                            {% endif %}
+                                            <div style="display: flex; gap: 8px;">
+                                                {% if strike.distance_from_price %}
+                                                <span style="font-size: 8px; color: #ffaa00; background: rgba(255,170,0,0.2); padding: 2px 4px; border-radius: 3px;">{{strike.distance_from_price}}</span>
+                                                {% endif %}
+                                                {% if strike.put_wall_strength %}
+                                                <span style="font-size: 8px; color: #ff4444; background: rgba(255,68,68,0.2); padding: 2px 4px; border-radius: 3px;">{{strike.put_wall_strength}} Wall</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                         {% endfor %}
+                                    </div>
+                                    {% endif %}
+
+                                    <!-- Concentration Analysis -->
+                                    {% if data.smart_money_insights.oi_concentration_zones.concentration_analysis %}
+                                    <div style="background: #0a0a0a; border-left: 3px solid #8a2be2; padding: 8px; margin-bottom: 8px;">
+                                        <div style="font-size: 9px; color: #8a2be2; font-weight: 600; margin-bottom: 4px;">🧠 CLUSTER ANALYSIS:</div>
+                                        <div style="font-size: 9px; color: #ccc; line-height: 1.3;">{{data.smart_money_insights.oi_concentration_zones.concentration_analysis}}</div>
+                                    </div>
+                                    {% endif %}
+
+                                    <!-- Put Wall Analysis for Credit Spreads -->
+                                    {% if data.smart_money_insights.oi_concentration_zones.put_wall_analysis %}
+                                    <div style="background: #0a0a0a; border-left: 3px solid #8a2be2; padding: 8px; margin-bottom: 8px;">
+                                        <div style="font-size: 9px; color: #8a2be2; font-weight: 600; margin-bottom: 4px;">🏗️ PUT WALL ANALYSIS:</div>
+                                        <div style="font-size: 9px; color: #ccc; line-height: 1.3;">{{data.smart_money_insights.oi_concentration_zones.put_wall_analysis}}</div>
+                                    </div>
+                                    {% endif %}
+
+                                    <!-- Safety Assessment -->
+                                    {% if data.smart_money_insights.oi_concentration_zones.safety_assessment %}
+                                    <div style="background: #0a0a0a; border-left: 3px solid #ffaa00; padding: 8px;">
+                                        <div style="font-size: 9px; color: #ffaa00; font-weight: 600; margin-bottom: 4px;">⚠️ SAFETY ASSESSMENT:</div>
+                                        <div style="font-size: 9px; color: #ccc; line-height: 1.3;">{{data.smart_money_insights.oi_concentration_zones.safety_assessment}}</div>
                                     </div>
                                     {% endif %}
                                 </div>
@@ -1796,5 +2029,9 @@ class HTMLGenerator:
 </body>
 </html>'''
         
-        template = Template(template_str)
+        # Create Jinja environment with custom filters
+        env = Environment()
+        env.filters['number_format'] = number_format
+
+        template = env.from_string(template_str)
         return template.render(**template_data)
