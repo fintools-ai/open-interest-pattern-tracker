@@ -153,7 +153,7 @@ class HTMLGenerator:
 
             # ALL trades for featured cards (consolidated by ticker)
             "high_conviction_trades": high_conviction_trades,
-            "consolidated_high_conviction_trades": self._get_consolidated_high_conviction_trades(clusters, max_count=6),
+            "consolidated_high_conviction_trades": self._get_consolidated_high_conviction_trades(clusters, max_count=None),
 
             # All recommendations for table
             "all_recommendations": all_recommendations,
@@ -633,7 +633,7 @@ class HTMLGenerator:
         
         return high_conviction  # Return ALL trades, not limited
 
-    def _get_consolidated_high_conviction_trades(self, clusters, max_count=6):
+    def _get_consolidated_high_conviction_trades(self, clusters, max_count=None):
         """Consolidate trades by ticker with multi-timeframe data"""
 
         # Collect all trades across timeframes
@@ -706,7 +706,7 @@ class HTMLGenerator:
             # Fallback sorting if confidence parsing fails
             consolidated_trades.sort(key=lambda x: len(x["timeframes"]), reverse=True)
 
-        return consolidated_trades[:max_count]
+        return consolidated_trades if max_count is None else consolidated_trades[:max_count]
 
     def _calculate_consensus(self, timeframe_trades):
         """Calculate consensus direction and confluence status"""
