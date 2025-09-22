@@ -5,17 +5,20 @@ LLM Analyzer - Uses AWS Bedrock to analyze OI patterns and generate trade recomm
 import json
 import boto3
 from datetime import datetime
-from config.settings import AWS_REGION, BEDROCK_MODEL_ID, TARGET_DTE
+from config.settings import AWS_REGION, BEDROCK_MODEL_ID, DEFAULT_DTE
 
 class LLMAnalyzer:
     def __init__(self):
         self.bedrock_client = boto3.client('bedrock-runtime', region_name=AWS_REGION)
         self.model_id = BEDROCK_MODEL_ID
     
-    def analyze_ticker(self, ticker_data, delta_data, market_context=None, price_data=None):
+    def analyze_ticker(self, ticker_data, delta_data, market_context=None, price_data=None, dte_period=None):
         """Analyze OI data with current prices and technical zones to generate trading recommendations"""
+        if dte_period is None:
+            dte_period = DEFAULT_DTE
+
         try:
-            prompt = self._build_analysis_prompt(ticker_data, delta_data, market_context, price_data)
+            prompt = self._build_analysis_prompt(ticker_data, delta_data, market_context, price_data, dte_period)
             
             #print(prompt)
             #print("--------------------------------------------------")
@@ -40,13 +43,19 @@ class LLMAnalyzer:
                 "analysis_timestamp": datetime.now().isoformat()
             }
     
-    def _build_analysis_prompt(self, ticker_data, delta_data, market_context, price_data):
+    def _build_analysis_prompt(self, ticker_data, delta_data, market_context, price_data, dte_period):
         """Build simple prompt with raw data dumps"""
         ticker = ticker_data.get("ticker", "UNKNOWN")
-        
+
         prompt = f"""You are a professional options trader with 15+ years experience. Analyze this comprehensive dataset for {ticker} like you're preparing a trading desk report.
 
-IMPORTANT: Use exactly {TARGET_DTE} days to expiration (DTE) for all recommendations.
+IMPORTANT: Use exactly {dte_period} days to expiration (DTE) for all recommendations.
+
+# TIMEFRAME CONTEXT
+You are analyzing {dte_period} DTE options for {ticker}. Consider these timeframe-specific factors:
+- 30 DTE: Short-term gamma effects, earnings catalysts, momentum plays
+- 50-60 DTE: Balanced theta/gamma, swing trading setups
+- 90 DTE: Institutional hedging, strategic positioning, longer-term trends
 
 # RAW DATA
 
@@ -64,14 +73,21 @@ IMPORTANT: Use exactly {TARGET_DTE} days to expiration (DTE) for all recommendat
 
 # PROFESSIONAL ANALYSIS REQUIREMENTS
 
-Analyze like a seasoned options trader with deep focus on OPEN INTEREST INTELLIGENCE:
+You are a quantitative options analyst specializing in institutional open interest analysis. Your task is to analyze open interest data across multiple dates to identify high-conviction trading opportunities.
+
+When analyzing open interest data:
+1. Look for unusual options activity and large positions
+2. Identify key support and resistance levels from strike concentrations
+3. Calculate directional bias from put/call ratios and flow
+4. Consider news context when interpreting the data
+5. Provide specific, actionable trading recommendations with exact strikes and expiration dates
+
 
 # CRITICAL / MOST IMPORTANT
 Use Open interest data as the primary source of analysis, use the technical data just for reference, but they are not the main deciding factor. The goal is to get as much insight from
 open interest data, this is the most critical data and all analysis should be based on this data set ONLY.
 
 **CRITICAL**: Pay special attention to OI delta changes, unusual strike activity, and institutional positioning clues. The technical analysis should SUPPORT the OI story, not lead it.
-
 
 
 ## PRIMARY FOCUS - SMART MONEY DETECTION:
@@ -149,7 +165,7 @@ Return JSON with this enhanced structure that extracts MAXIMUM intelligence from
     "target_price": 185.00,
     "stop_loss": 170.00,
     "expiry_date": "YYYY-MM-DD",
-    "days_to_expiry": {TARGET_DTE},
+    "days_to_expiry": {dte_period},
     "risk_reward_ratio": "1:2.0",
     "success_probability": 75,
     "position_size_pct": 2.5,
@@ -183,37 +199,85 @@ Return JSON with this enhanced structure that extracts MAXIMUM intelligence from
         {{"strike": 645, "oi": 27423, "interpretation": "Secondary target level"}}
       ],
       "heavy_put_strikes": [
-        {{"strike": 620, "oi": 58882, "interpretation": "Major support/hedge level"}},
-        {{"strike": 610, "oi": 119307, "interpretation": "Institutional protection zone"}}
+        {{"strike": 620, "oi": 58882, "interpretation": "Major support/hedge level", "distance_from_price": "5.2% OTM", "put_wall_strength": "Strong"}},
+        {{"strike": 610, "oi": 119307, "interpretation": "Institutional protection zone", "distance_from_price": "7.8% OTM", "put_wall_strength": "Very Strong"}}
       ],
-      "concentration_analysis": "Describe what the strike clustering reveals"
+      "concentration_analysis": "Describe what the strike clustering reveals",
+      "put_wall_analysis": "Identify strikes with >30K OI that could serve as put credit spread support levels",
+      "safety_assessment": "Evaluate distance from current price to major put strikes for spread safety"
     }},
     "flow_analysis": {{
-      "net_positioning": "Bullish/Bearish based on OI changes",
+      "net_positioning": "Bullish/Bearish based on OI changes - be explicit: BULLISH_CALL_ACCUMULATION, BEARISH_PUT_ACCUMULATION, or NEUTRAL_MIXED",
       "large_blocks": ["Large OI additions at specific strikes"],
       "unusual_activity": ["Unusual patterns detected"],
-      "dark_pool_signals": "Stealth positioning if detected"
+      "dark_pool_signals": "Stealth positioning if detected",
+      "directional_bias": "CALL_HEAVY (more call than put activity) | PUT_HEAVY (more put than call activity) | BALANCED"
     }},
     "put_call_dynamics": {{
       "ratio": 1.21,
       "change": -0.05,
       "interpretation": "What the P/C ratio reveals",
-      "smart_money_view": "Institutional hedging vs directional bets"
+      "smart_money_view": "Institutional hedging vs directional bets",
+      "signal_classification": "BULLISH_CALLS (ratio < 0.5) | BEARISH_PUTS (ratio > 1.5) | NEUTRAL (0.5-1.5)"
     }},
     "max_pain_analysis": {{
       "level": 634.0,
       "shift": 2.0,
-      "pin_risk": "High/Medium/Low",
-      "dealer_impact": "How dealers will hedge"
+      "pin_risk": "High/Medium/Low - CRITICAL for put credit spread safety",
+      "dealer_impact": "How dealers will hedge",
+      "support_strength": "Strong/Medium/Weak - based on OI concentration at max pain",
+      "safety_margin": "Calculate percentage distance from current price to max pain level"
     }},
     "gamma_analysis": {{
-      "net_exposure": "Positive/Negative gamma zones",
+      "net_exposure": "Positive/Negative gamma zones with detailed explanation",
       "flip_point": 632.5,
       "squeeze_risk": "High/Medium/Low",
-      "volatility_impact": "Expected volatility behavior"
+      "volatility_impact": "Expected volatility behavior and market maker hedging impact",
+      "squeeze_direction": "Upward/Downward based on current price vs flip point", 
+      "gamma_profile": "Distribution of gamma across strikes",
+      "dealer_positioning": "How market makers will hedge and impact price action",
+      "squeeze_catalyst": "What could trigger the gamma squeeze (earnings, news, etc.)"
+    }},
+    "put_credit_spread_analysis": {{
+      "suitability": "High/Medium/Low/None - based on put wall strength and safety margins",
+      "recommended_strikes": {{
+        "short_put": 610,
+        "long_put": 600,
+        "safety_margin": "7.8% to short strike",
+        "max_profit": "Credit received",
+        "max_risk": "Width of spread minus credit"
+      }},
+      "risk_factors": ["Pin risk assessment", "Early assignment risk", "Volatility expansion risk"],
+      "ideal_entry_conditions": ["Price above max pain", "Low volatility environment", "Strong put wall intact"],
+      "put_wall_integrity": "Strong/Weak - likelihood of put support holding",
+      "credit_spread_thesis": "Why this setup favors premium sellers vs buyers"
     }}
   }}
 }}
+
+## SIGNAL CATEGORIZATION GUIDANCE:
+When analyzing data, pay special attention to these signal thresholds for dashboard categorization:
+
+**BULLISH CALL SIGNALS:**
+- Put/Call ratio < 0.5 (strong call bias)
+- Heavy call OI concentration 10-20% OTM
+- Net positioning shows "BULLISH_CALL_ACCUMULATION"
+- Pattern types: "institutional_accumulation", "gamma_squeeze_setup"
+
+**BEARISH PUT SIGNALS:**
+- Put/Call ratio > 1.5 (strong put bias)
+- Heavy put OI at current price levels or ITM
+- Net positioning shows "BEARISH_PUT_ACCUMULATION"
+- Pattern types: "distribution", "protective_hedging"
+
+**PUT CREDIT SPREAD SIGNALS:**
+- Massive put OI concentrations (>50,000 contracts) creating "put walls"
+- Current price significantly above max pain level (>3% safety margin)
+- Heavy put strikes well below current price (>5% OTM)
+- Low to medium pin risk (avoid high pin risk scenarios)
+- Pattern types: "protective_hedging" indicating institutional support levels
+
+**CRITICAL:** Ensure put_call_dynamics.ratio is always a numeric value (e.g., 1.21, 0.45, 2.3) for proper signal processing.
 
 CRITICAL: You MUST classify every ticker as either CALL or PUT direction - NO NEUTRAL allowed. Even if confidence is low, pick the most likely direction based on the data. Provide analysis and recommendations for ALL tickers regardless of confidence or success probability.
 """

@@ -8,7 +8,7 @@ import json
 import subprocess
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from config.settings import MCP_OI_EXECUTABLE, MCP_MARKET_DATA_EXECUTABLE, TICKERS, OI_ANALYSIS_DAYS, TARGET_DTE
+from config.settings import MCP_OI_EXECUTABLE, MCP_MARKET_DATA_EXECUTABLE, TICKERS, OI_ANALYSIS_DAYS, DEFAULT_DTE
 
 class MCPOIClient:
     def __init__(self, cmd: str = MCP_OI_EXECUTABLE, args: Optional[List[str]] = None):
@@ -89,11 +89,11 @@ class EnhancedOIDataCollector:
         self.tickers = TICKERS
         self.analysis_days = OI_ANALYSIS_DAYS
     
-    async def collect_ticker_data(self, ticker):
+    async def collect_ticker_data(self, ticker, target_dte=DEFAULT_DTE):
         """Collect comprehensive data for a single ticker (OI + current prices)"""
         try:
             # Collect both OI data and current market data in parallel
-            oi_task = self._call_oi_mcp_server(ticker)
+            oi_task = self._call_oi_mcp_server(ticker, target_dte)
             market_data_task = self._call_market_data_mcp_server(ticker)
             
             oi_result, market_data_result = await asyncio.gather(
@@ -142,15 +142,15 @@ class EnhancedOIDataCollector:
                 "timestamp": datetime.now().isoformat()
             }
     
-    async def _call_oi_mcp_server(self, ticker):
+    async def _call_oi_mcp_server(self, ticker, target_dte):
         """Call the MCP OpenInterest server using the working client"""
         client = MCPOIClient()
         try:
             await client.start()
             result = await client.call_tool("analyze_open_interest", {
                 "ticker": ticker,
-                "days": self.analysis_days,
-                "target_dte": TARGET_DTE,
+                "days": target_dte,  # Use target_dte for both days and target_dte
+                "target_dte": target_dte,
                 "include_news": True
             })
             return result
@@ -241,18 +241,28 @@ class EnhancedOIDataCollector:
         return json.loads(result_content)
     
     async def collect_all_tickers(self):
-        """Collect OI data for all tickers in parallel"""
-        print(f"Starting OI data collection for {len(self.tickers)} tickers: {self.tickers}")
-        print(f"Analysis days: {self.analysis_days}")
-        print(f"Target DTE: {TARGET_DTE} days")
-        
+        """Collect OI data for all tickers across multiple timeframes"""
+        print(f"Starting multi-timeframe OI data collection for {len(self.tickers)} tickers: {self.tickers}")
+        print(f"DTE periods: {self.analysis_days}")
+
         # Execute tasks sequentially for better debugging
         results = []
-        for ticker in self.tickers:
-            print(f"\nProcessing {ticker}...")
-            result = await self.collect_ticker_data(ticker)
-            results.append(result)
-            print(f"Completed {ticker}: {result['status']}")
+
+        # For each DTE period, collect data for all tickers
+        for dte_period in self.analysis_days:
+            print(f"\n=== Processing {dte_period} DTE timeframe ===")
+
+            for ticker in self.tickers:
+                print(f"\nProcessing {ticker} ({dte_period} DTE)...")
+                result = await self.collect_ticker_data(ticker, dte_period)
+
+                # Add DTE info to result for identification
+                result["dte_period"] = dte_period
+                if result["status"] == "success":
+                    result["data"]["dte_period"] = dte_period
+
+                results.append(result)
+                print(f"Completed {ticker} ({dte_period} DTE): {result['status']}")
         
         #print(results)
         #print("=====")
@@ -289,29 +299,42 @@ class EnhancedOIDataCollector:
             for failure in failed_results:
                 print(f"  {failure.get('ticker', 'unknown')}: {failure.get('error', 'unknown error')}")
         
-        # Format as dict with ticker as key
+        # Format as nested dict with ticker and DTE as keys
         ticker_data = {}
-        
+
         for result in successful_results:
             ticker = result['ticker']
+            dte_period = result['dte_period']
             data = result['data']
-            
-            ticker_data[ticker] = {
+
+            # Initialize ticker if not exists
+            if ticker not in ticker_data:
+                ticker_data[ticker] = {}
+
+            ticker_data[ticker][str(dte_period)] = {
                 "oi_data": data.get('oi_data') if data.get('oi_status') == 'success' else None,
                 "market_data": data.get('market_data') if data.get('market_data_status') == 'success' else None,
                 "oi_error": data.get('oi_error') if data.get('oi_status') == 'error' else None,
                 "market_data_error": data.get('market_data_error') if data.get('market_data_status') == 'error' else None,
+                "dte_period": dte_period,
                 "timestamp": result['timestamp']
             }
-        
+
         # Add failed tickers
         for failure in failed_results:
             ticker = failure.get('ticker', 'unknown')
-            ticker_data[ticker] = {
+            dte_period = failure.get('dte_period', DEFAULT_DTE)
+
+            # Initialize ticker if not exists
+            if ticker not in ticker_data:
+                ticker_data[ticker] = {}
+
+            ticker_data[ticker][str(dte_period)] = {
                 "oi_data": None,
                 "market_data": None,
                 "oi_error": failure.get('error'),
                 "market_data_error": None,
+                "dte_period": dte_period,
                 "timestamp": failure.get('timestamp')
             }
         
