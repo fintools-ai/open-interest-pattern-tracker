@@ -16,6 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from analysis.interactive_analyzer import InteractiveAnalysisService
 from data_pipeline.redis_manager import RedisManager
+from config.settings import OI_ANALYSIS_DAYS, DEFAULT_DTE
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend integration
@@ -35,12 +36,22 @@ def create_analysis_session():
         if not ticker:
             return jsonify({"error": "Ticker is required"}), 400
         
-        # Get current analysis from Redis (latest)
+        # Get current analysis from Redis (multi-timeframe support)
         today = datetime.now().strftime('%Y-%m-%d')
-        current_analysis = redis_manager.get_analysis_result(ticker, today)
-        
+
+        # Try to get analysis for configured DTE periods (prioritize DEFAULT_DTE)
+        current_analysis = None
+        preferred_dtes = [DEFAULT_DTE] + [dte for dte in OI_ANALYSIS_DAYS if dte != DEFAULT_DTE]
+
+        for dte in preferred_dtes:
+            analysis_key = f"{ticker}:{dte}DTE"
+            current_analysis = redis_manager.get_analysis_result(analysis_key, today)
+            if current_analysis:
+                print(f"Found analysis for {ticker} at {dte} DTE")
+                break
+
         if not current_analysis:
-            return jsonify({"error": f"No analysis found for {ticker}"}), 404
+            return jsonify({"error": f"No analysis found for {ticker} across any timeframes"}), 404
         
         # Create session
         session_id = interactive_service.create_session(ticker, current_analysis)
