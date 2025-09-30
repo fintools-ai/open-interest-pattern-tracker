@@ -51,14 +51,12 @@ class LLMAnalyzer:
 
 IMPORTANT: Use exactly {dte_period} days to expiration (DTE) for all recommendations.
 
-# ACCURACY OVER ACTIVITY PRINCIPLE:
-Your reputation depends on accuracy, not trade frequency. It's better to:
-- Miss 10 mediocre opportunities than recommend 1 poor trade
-- Say 'NO_TRADE' for 70% of tickers than force weak recommendations
-- Acknowledge uncertainty rather than project false confidence
-- Admit when data is insufficient for reliable analysis
-
-SUCCESSFUL ANALYSTS: Recommend trades only when edge is clear and measurable.
+# INSTITUTIONAL ANALYST PRINCIPLE:
+You are analyzing institutional open interest patterns to identify trading opportunities.
+- Provide directional bias based on the data available (CALL or PUT)
+- Use confidence scores to reflect uncertainty (lower confidence = more uncertain)
+- Support your analysis with evidence from the OI data
+- Be explicit about risks and potential challenges
 
 # ANTI-BIAS RULES:
 1. Not every OI pattern is actionable - most are noise
@@ -156,6 +154,7 @@ CRITICAL OUTPUT FORMATTING RULES:
 5. target_price = the STOCK price target where you'd take profits
 6. stop_loss = the STOCK price level where you'd exit at a loss
 7. Extract current stock price from technical data and put in current_price as plain number
+8. **CRITICAL**: days_to_expiry MUST be set to {dte_period} (the exact value provided above)
 
 IMPORTANT: ALL prices should be STOCK prices, not option premiums. This makes it clear where the underlying stock should be for entry/exit.
 
@@ -165,17 +164,14 @@ IMPORTANT: ALL prices should be STOCK prices, not option premiums. This makes it
 3. **Buy Put**: When smart money is accumulating puts, distribution detected, or strong bearish OI flow  
 4. **Put Credit Spread**: When high put OI concentration suggests support level, or neutral-to-bullish bias with high IV
 
-# ACCURACY FIX: Only recommend trades when conviction is justified by data.
-# If OI patterns are weak or conflicting, recommend NO_TRADE.
-# False signals are more costly than missed opportunities.
-
-## DATA QUALITY ASSESSMENT (Required):
+## DATA QUALITY ASSESSMENT:
+Always assess the quality of data sources:
 1. OI Data Quality: High/Medium/Low/Insufficient
 2. Delta Reliability: Strong signal/Weak signal/Baseline only/Corrupted
 3. Technical Confluence: Confirming/Neutral/Conflicting
 4. Overall Data Score: A/B/C/D/F
 
-IF Data Score = D or F: MANDATORY NO_TRADE recommendation
+Use confidence scores to reflect data quality concerns (lower confidence for lower quality data).
 
 Return JSON with this enhanced structure that extracts MAXIMUM intelligence from the open interest data:
 
@@ -324,20 +320,15 @@ When analyzing data, pay special attention to these signal thresholds for dashbo
 
 **CRITICAL:** Ensure put_call_dynamics.ratio is always a numeric value (e.g., 1.21, 0.45, 2.3) for proper signal processing.
 
-# ACCURACY FIX: Classify tickers as CALL, PUT, or NO_TRADE when signals are unclear or conflicting.
-# NO_TRADE is a valid recommendation when risk/reward is poor or data is insufficient.
-# Only recommend trades when conviction is justified by data. If OI patterns are weak or
-# conflicting, recommend NO_TRADE. False signals are more costly than missed opportunities.
-
 ## REALISTIC SUCCESS PROBABILITY CALIBRATION:
-- 90%+: Extremely rare, multiple strong confluences (1% of signals)
-- 80-89%: Strong setup with clear catalyst (5% of signals)
-- 70-79%: Good setup with reasonable conviction (15% of signals)
-- 60-69%: Modest edge, acceptable risk/reward (25% of signals)
-- 50-59%: Weak signal, consider skipping (35% of signals)
-- <50%: NO_TRADE mandatory (20% of signals)
+Use confidence scores realistically based on signal strength:
+- 85-95%: Strong setup with multiple confirming signals and clear catalyst
+- 70-84%: Good setup with reasonable conviction and supporting evidence
+- 55-69%: Modest edge with acceptable risk/reward
+- 40-54%: Weak signal with lower conviction
+- Below 40%: Very uncertain, consider indicating lower confidence
 
-Most accurate analysts achieve 55-65% success rates in real trading.
+Most accurate analysts achieve 55-70% success rates in real trading. Adjust confidence accordingly.
 """
         return prompt
     
@@ -381,33 +372,7 @@ Most accurate analysts achieve 55-65% success rates in real trading.
             for section in required_sections:
                 if section not in analysis:
                     raise ValueError(f"Missing required section: {section}")
-            
-# ACCURACY FIX: Apply confidence thresholds
-            confidence = analysis["pattern_analysis"].get("confidence_score", 0)
-            success_prob = analysis["trade_recommendation"].get("success_probability", 0)
 
-            # Convert to int if they're numeric, otherwise skip validation
-            try:
-                confidence = int(confidence) if isinstance(confidence, (int, float, str)) and str(confidence).isdigit() else 0
-                success_prob = int(success_prob) if isinstance(success_prob, (int, float, str)) and str(success_prob).isdigit() else 0
-            except (ValueError, TypeError):
-                confidence = 0
-                success_prob = 0
-
-            # Implement confidence thresholds:
-            # >75% confidence: Full position size
-            # 60-75%: Reduced position size
-            # <60%: Paper trade or skip
-            # <40%: Mandatory NO_TRADE
-            if confidence < 40:
-                analysis["trade_recommendation"]["instrument"] = "NO_TRADE"
-                analysis["trade_recommendation"]["direction"] = "NO_TRADE"
-                analysis["trade_recommendation"]["specific_entry"] = "Low confidence - insufficient data quality"
-            elif confidence < 60:
-                # Reduce position size for low confidence
-                current_pos = analysis["trade_recommendation"].get("position_size_pct", 2.5)
-                analysis["trade_recommendation"]["position_size_pct"] = max(0.5, current_pos * 0.5)
-            
             return analysis
             
         except Exception as e:

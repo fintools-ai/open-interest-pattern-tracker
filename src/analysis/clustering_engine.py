@@ -86,15 +86,15 @@ class ClusteringEngine:
             success_prob_num = safe_int(trade_rec.get("success_probability", 0))
             
             # No filtering based on confidence thresholds - classify all trades
-            
-            # Classify based on direction - must be either bullish or bearish
+
+            # Classify based on direction from LLM
             if direction == "CALL":
                 return "bullish"
             elif direction == "PUT":
                 return "bearish"
             else:
-                # Force classification as bullish if no clear direction
-                return "bullish"
+                # Skip tickers with unclear direction rather than forcing a bias
+                return "unclear"
                 
         except Exception as e:
             return f"classification_error_{str(e)}"
