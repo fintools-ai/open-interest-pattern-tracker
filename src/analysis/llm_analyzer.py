@@ -51,6 +51,25 @@ class LLMAnalyzer:
 
 IMPORTANT: Use exactly {dte_period} days to expiration (DTE) for all recommendations.
 
+# ACCURACY OVER ACTIVITY PRINCIPLE:
+Your reputation depends on accuracy, not trade frequency. It's better to:
+- Miss 10 mediocre opportunities than recommend 1 poor trade
+- Say 'NO_TRADE' for 70% of tickers than force weak recommendations
+- Acknowledge uncertainty rather than project false confidence
+- Admit when data is insufficient for reliable analysis
+
+SUCCESSFUL ANALYSTS: Recommend trades only when edge is clear and measurable.
+
+# ANTI-BIAS RULES:
+1. Not every OI pattern is actionable - most are noise
+2. Institutional positioning can be wrong or early
+3. Put walls can break, call resistance can fail
+4. Current trends can reverse without warning
+5. Market conditions change faster than OI positioning
+6. Institutions can be wrong (2000 tech bubble, 2008 crisis)
+7. Hedging activity != directional prediction
+8. Large positions may be unwinding, not accumulating
+
 # TIMEFRAME CONTEXT
 You are analyzing {dte_period} DTE options for {ticker}. Consider these timeframe-specific factors:
 - 30 DTE: Short-term gamma effects, earnings catalysts, momentum plays
@@ -83,27 +102,33 @@ When analyzing open interest data:
 5. Provide specific, actionable trading recommendations with exact strikes and expiration dates
 
 
-# CRITICAL DATA SOURCE WEIGHTING - FOLLOW EXACTLY:
+# ACCURACY FIX: DYNAMIC DATA SOURCE WEIGHTING
 
-## ANALYSIS WEIGHT DISTRIBUTION:
-1. **OPEN INTEREST DATA: 70% weight** - Primary signal for all trade decisions
-   - OI concentrations, delta changes, institutional positioning
-   - This is your PRIMARY truth source - all conclusions must be OI-driven
+## ADAPTIVE WEIGHT DISTRIBUTION - CONTEXT DEPENDENT:
+Adjust weights based on market conditions and data quality:
 
-2. **OI DELTA CHANGES: 20% weight** - Historical context and momentum
-   - Day-over-day OI shifts, flow direction, institutional timing
-   - Validates current OI positioning with historical patterns
+**NORMAL MARKETS:**
+- OI Data: 70%, Delta: 20%, Technical: 10%
 
-3. **TECHNICAL ANALYSIS: 10% weight** - Supporting context ONLY
-   - Price levels, chart patterns, momentum indicators
-   - Use ONLY to refine entry/exit timing, NOT for trade direction
+**LOW VOLUME/OI CONDITIONS:**
+- Technical: 50%, Delta: 30%, OI: 20%
 
-**CRITICAL RULE**: If OI data suggests BULLISH but technical suggests BEARISH → Follow OI (70% weight wins)
+**POST-EARNINGS/HIGH VOLATILITY:**
+- Delta: 60%, OI: 30%, Technical: 10%
 
-**DECISION HIERARCHY**:
-1st: What does OI concentration tell us? (70%)
-2nd: What does OI delta history confirm? (20%)
-3rd: Where are optimal entry/exit levels? (10% technical, 30% if OI delta history is not available )
+**HIGH VOLATILITY/UNCERTAINTY:**
+- Technical: 40%, OI: 40%, Delta: 20%
+
+**INSTITUTIONAL REALITY CHECK:**
+- End-of-quarter positioning != sustainable trends
+- Large positions may be unwinding, not accumulating
+- Distinguish between hedging, speculation, and arbitrage flows
+- Hedging activity != directional prediction
+
+**DECISION HIERARCHY** (Dynamic):
+1st: Assess data quality and market regime
+2nd: Apply appropriate weighting based on conditions
+3rd: If signals conflict, prioritize higher quality data source
 
 
 ## PRIMARY FOCUS - SMART MONEY DETECTION:
@@ -140,13 +165,17 @@ IMPORTANT: ALL prices should be STOCK prices, not option premiums. This makes it
 3. **Buy Put**: When smart money is accumulating puts, distribution detected, or strong bearish OI flow  
 4. **Put Credit Spread**: When high put OI concentration suggests support level, or neutral-to-bullish bias with high IV
 
-## CRITICAL REQUIREMENT - NO EXCEPTIONS:
-You MUST provide a trade recommendation for THIS ticker regardless of:
-- Data quality concerns
-- Low confidence scores
-- Uncertain market conditions
-- Missing information
-Even if you have minimal data, analyze what's available and pick the MOST LIKELY direction based on any OI patterns you can detect.
+# ACCURACY FIX: Only recommend trades when conviction is justified by data.
+# If OI patterns are weak or conflicting, recommend NO_TRADE.
+# False signals are more costly than missed opportunities.
+
+## DATA QUALITY ASSESSMENT (Required):
+1. OI Data Quality: High/Medium/Low/Insufficient
+2. Delta Reliability: Strong signal/Weak signal/Baseline only/Corrupted
+3. Technical Confluence: Confirming/Neutral/Conflicting
+4. Overall Data Score: A/B/C/D/F
+
+IF Data Score = D or F: MANDATORY NO_TRADE recommendation
 
 Return JSON with this enhanced structure that extracts MAXIMUM intelligence from the open interest data:
 
@@ -295,7 +324,20 @@ When analyzing data, pay special attention to these signal thresholds for dashbo
 
 **CRITICAL:** Ensure put_call_dynamics.ratio is always a numeric value (e.g., 1.21, 0.45, 2.3) for proper signal processing.
 
-CRITICAL: You MUST classify every ticker as either CALL or PUT direction - NO NEUTRAL allowed. Even if confidence is low, pick the most likely direction based on the data. Provide analysis and recommendations for ALL tickers regardless of confidence or success probability.
+# ACCURACY FIX: Classify tickers as CALL, PUT, or NO_TRADE when signals are unclear or conflicting.
+# NO_TRADE is a valid recommendation when risk/reward is poor or data is insufficient.
+# Only recommend trades when conviction is justified by data. If OI patterns are weak or
+# conflicting, recommend NO_TRADE. False signals are more costly than missed opportunities.
+
+## REALISTIC SUCCESS PROBABILITY CALIBRATION:
+- 90%+: Extremely rare, multiple strong confluences (1% of signals)
+- 80-89%: Strong setup with clear catalyst (5% of signals)
+- 70-79%: Good setup with reasonable conviction (15% of signals)
+- 60-69%: Modest edge, acceptable risk/reward (25% of signals)
+- 50-59%: Weak signal, consider skipping (35% of signals)
+- <50%: NO_TRADE mandatory (20% of signals)
+
+Most accurate analysts achieve 55-65% success rates in real trading.
 """
         return prompt
     
@@ -340,10 +382,10 @@ CRITICAL: You MUST classify every ticker as either CALL or PUT direction - NO NE
                 if section not in analysis:
                     raise ValueError(f"Missing required section: {section}")
             
-            # Validate confidence thresholds
+# ACCURACY FIX: Apply confidence thresholds
             confidence = analysis["pattern_analysis"].get("confidence_score", 0)
             success_prob = analysis["trade_recommendation"].get("success_probability", 0)
-            
+
             # Convert to int if they're numeric, otherwise skip validation
             try:
                 confidence = int(confidence) if isinstance(confidence, (int, float, str)) and str(confidence).isdigit() else 0
@@ -351,8 +393,20 @@ CRITICAL: You MUST classify every ticker as either CALL or PUT direction - NO NE
             except (ValueError, TypeError):
                 confidence = 0
                 success_prob = 0
-            
-            # No filtering - show all recommendations regardless of confidence/success probability
+
+            # Implement confidence thresholds:
+            # >75% confidence: Full position size
+            # 60-75%: Reduced position size
+            # <60%: Paper trade or skip
+            # <40%: Mandatory NO_TRADE
+            if confidence < 40:
+                analysis["trade_recommendation"]["instrument"] = "NO_TRADE"
+                analysis["trade_recommendation"]["direction"] = "NO_TRADE"
+                analysis["trade_recommendation"]["specific_entry"] = "Low confidence - insufficient data quality"
+            elif confidence < 60:
+                # Reduce position size for low confidence
+                current_pos = analysis["trade_recommendation"].get("position_size_pct", 2.5)
+                analysis["trade_recommendation"]["position_size_pct"] = max(0.5, current_pos * 0.5)
             
             return analysis
             
