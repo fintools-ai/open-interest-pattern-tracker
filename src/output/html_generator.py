@@ -70,8 +70,9 @@ class HTMLGenerator:
             # Load and render template
             dashboard_html = self._render_dashboard_template(template_data)
             
-            # Save dashboard file
-            dashboard_path = os.path.join(self.daily_output_dir, "dashboards", "daily_overview.html")
+            # Save dashboard file with timestamp to prevent overwriting
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            dashboard_path = os.path.join(self.daily_output_dir, "dashboards", f"daily_overview_{timestamp}.html")
             with open(dashboard_path, 'w', encoding='utf-8') as f:
                 f.write(dashboard_html)
             
@@ -891,8 +892,30 @@ class HTMLGenerator:
         .trade-card.consensus-bullish { border-left: 4px solid #00ff88; }
         .trade-card.consensus-bearish { border-left: 4px solid #ff4444; }
         .trade-card.consensus-mixed { border-left: 4px solid #ffaa00; }
-        .click-hint { position: absolute; bottom: 10px; right: 15px; color: #666; font-size: 11px; opacity: 0; transition: opacity 0.3s ease; }
-        .trade-card:hover .click-hint { opacity: 1; }
+
+        /* Interactive Analysis Button */
+        .interactive-analysis-btn {
+            width: 100%;
+            padding: 12px 20px;
+            background: rgba(0, 255, 136, 0.05);
+            color: #00ff88;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            letter-spacing: 0.3px;
+        }
+        .interactive-analysis-btn:hover {
+            background: rgba(0, 255, 136, 0.15);
+            border-color: #00ff88;
+            color: #fff;
+            transform: translateY(-1px);
+        }
+        .interactive-analysis-btn:active {
+            transform: translateY(0);
+        }
 
         /* Enhanced Card Header */
         .card-header { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px; border-bottom: 1px solid #333; }
@@ -1462,9 +1485,7 @@ class HTMLGenerator:
             <div class="trade-cards">
                 {% for trade in consolidated_high_conviction_trades %}
                 <div class="trade-card consensus-{{trade.consensus_direction}}"
-                     data-ticker="{{trade.ticker}}"
-                     onclick="openInteractiveAnalysis('{{trade.ticker}}', '{{trade.consensus_direction}}')">
-                    <div class="click-hint">Click for interactive session</div>
+                     data-ticker="{{trade.ticker}}">
 
                     <!-- Enhanced Card Header -->
                     <div class="card-header">
@@ -1906,6 +1927,14 @@ class HTMLGenerator:
                             <span class="timeline-label">{{dte}}D: {{data.confidence}}</span>
                             {% endfor %}
                         </div>
+                    </div>
+
+                    <!-- Interactive Analysis Button -->
+                    <div style="padding: 15px; border-top: 1px solid #333;">
+                        <button class="interactive-analysis-btn"
+                                onclick="openInteractiveAnalysis('{{trade.ticker}}', '{{trade.consensus_direction}}')">
+                            Start Interactive Analysis
+                        </button>
                     </div>
                 </div>
                 {% endfor %}
