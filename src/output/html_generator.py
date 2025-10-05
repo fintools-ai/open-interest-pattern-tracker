@@ -2377,13 +2377,6 @@ class HTMLGenerator:
         let spiderChartInstance = null;
 
         function openSpiderChart(ticker) {
-            const modal = document.getElementById('spiderModal');
-            const titleEl = document.getElementById('spider-title');
-            const insightsEl = document.getElementById('spider-insights');
-            const rawMetricsGrid = document.getElementById('raw-metrics-grid');
-
-            titleEl.textContent = `${ticker} - DTE Analysis`;
-
             if (!spiderChartData[ticker]) {
                 alert(`No multi-timeframe data available for ${ticker}`);
                 return;
@@ -2395,8 +2388,8 @@ class HTMLGenerator:
             // Get primary timeframe data (30 DTE) for raw metrics display
             const primaryData = tickerData[dteList[0]];
 
-            // Populate raw metrics panel
-            rawMetricsGrid.innerHTML = `
+            // Generate raw metrics HTML
+            const rawMetricsHTML = `
                 <div style="background: rgba(26, 31, 46, 0.8); border: 1px solid #2a3f5f; border-radius: 8px; padding: 12px;">
                     <div style="font-size: 11px; color: #8892b0; margin-bottom: 5px;">Put/Call Ratio</div>
                     <div style="font-size: 20px; font-weight: 700; color: #4caf50;">${(primaryData.raw_pc_ratio || 0).toFixed(2)}</div>
@@ -2440,19 +2433,47 @@ class HTMLGenerator:
                 </div>
             `;
 
-            // Prepare datasets
-            const datasets = [];
-            const colors = {
-                '30': { bg: 'rgba(0, 255, 136, 0.15)', border: 'rgba(0, 255, 136, 0.8)', point: 'rgba(0, 255, 136, 1)' },
-                '60': { bg: 'rgba(255, 165, 0, 0.15)', border: 'rgba(255, 165, 0, 0.8)', point: 'rgba(255, 165, 0, 1)' },
-                '90': { bg: 'rgba(102, 126, 234, 0.15)', border: 'rgba(102, 126, 234, 0.8)', point: 'rgba(102, 126, 234, 1)' }
-            };
+            // Generate insights text
+            const insights = [];
+            const avgConfidences = dteList.map(dte => tickerData[dte].raw_confidence || 0);
+            const avgConf = avgConfidences.reduce((a, b) => a + b, 0) / avgConfidences.length;
 
-            dteList.forEach(dte => {
+            if (avgConf >= 80) {
+                insights.push(`✓ <strong>Strong Confluence:</strong> All timeframes show strong alignment with ${avgConf.toFixed(0)}% average confidence`);
+            } else if (avgConf >= 60) {
+                insights.push(`✓ <strong>Moderate Confluence:</strong> Timeframes show ${avgConf.toFixed(0)}% average confidence`);
+            } else {
+                insights.push(`⚠ <strong>Weak Confluence:</strong> Mixed signals with ${avgConf.toFixed(0)}% average confidence`);
+            }
+
+            const bestDTE = dteList.reduce((best, dte) => {
+                const score = tickerData[dte].risk_reward_score || 0;
+                const bestScore = tickerData[best].risk_reward_score || 0;
+                return score > bestScore ? dte : best;
+            });
+            insights.push(`✓ <strong>Best Entry:</strong> ${bestDTE} DTE shows highest risk-reward score (${tickerData[bestDTE].risk_reward_score})`);
+
+            const smartMoneyScores = dteList.map(dte => tickerData[dte].smart_money_flow);
+            const avgSmartMoney = smartMoneyScores.reduce((a, b) => a + b, 0) / smartMoneyScores.length;
+            if (avgSmartMoney >= 80) {
+                insights.push(`✓ <strong>Smart Money:</strong> Consistent institutional positioning across all timeframes (${avgSmartMoney.toFixed(0)}/100)`);
+            } else if (avgSmartMoney >= 60) {
+                insights.push(`⚠ <strong>Smart Money:</strong> Moderate institutional interest (${avgSmartMoney.toFixed(0)}/100)`);
+            }
+
+            const insightsHTML = insights.join('<br><br>');
+
+            // Generate datasets JSON
+            const datasetsJSON = JSON.stringify(dteList.map(dte => {
                 const data = tickerData[dte];
+                const colors = {
+                    '30': { bg: 'rgba(0, 255, 136, 0.15)', border: 'rgba(0, 255, 136, 0.8)', point: 'rgba(0, 255, 136, 1)' },
+                    '60': { bg: 'rgba(255, 165, 0, 0.15)', border: 'rgba(255, 165, 0, 0.8)', point: 'rgba(255, 165, 0, 1)' },
+                    '90': { bg: 'rgba(102, 126, 234, 0.15)', border: 'rgba(102, 126, 234, 0.8)', point: 'rgba(102, 126, 234, 1)' }
+                };
                 const color = colors[dte] || { bg: 'rgba(255, 255, 255, 0.15)', border: 'rgba(255, 255, 255, 0.8)', point: 'rgba(255, 255, 255, 1)' };
 
-                datasets.push({
+                return {
                     label: `${dte} DTE`,
                     data: [
                         data.risk_reward_score,
@@ -2471,92 +2492,277 @@ class HTMLGenerator:
                     pointBorderWidth: 2,
                     pointRadius: 5,
                     pointHoverRadius: 7
-                });
-            });
+                };
+            }));
 
-            // Destroy existing chart if any
-            if (spiderChartInstance) {
-                spiderChartInstance.destroy();
-            }
+            // Generate complete standalone HTML page
+            const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${ticker} - DTE Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1f2e 100%);
+            color: #e0e0e0;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: linear-gradient(135deg, #1a1f2e 0%, #151922 100%);
+            border: 2px solid #2a3f5f;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #2a3f5f;
+        }
+        h1 {
+            font-size: 32px;
+            color: #00ff88;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            font-size: 16px;
+            color: #8892b0;
+        }
+        .raw-metrics-panel {
+            background: rgba(0, 255, 136, 0.05);
+            border: 2px solid rgba(0, 255, 136, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .panel-title {
+            color: #00ff88;
+            font-size: 18px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        .metric-card {
+            background: rgba(26, 31, 46, 0.8);
+            border: 1px solid #2a3f5f;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .metric-label {
+            font-size: 11px;
+            color: #8892b0;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .metric-description {
+            font-size: 12px;
+            color: #c0c0c0;
+            margin-top: 5px;
+            margin-bottom: 8px;
+        }
+        .metric-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .chart-container {
+            position: relative;
+            height: 500px;
+            margin-bottom: 30px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(42, 63, 95, 0.3);
+            padding: 10px 20px;
+            border-radius: 8px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        .legend-label {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .insights-panel {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(42, 63, 95, 0.2);
+            border-radius: 12px;
+            border-left: 4px solid #00ff88;
+        }
+        .insights-title {
+            font-size: 20px;
+            color: #00ff88;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        .insights-content {
+            font-size: 14px;
+            color: #c0c0c0;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>${ticker} - DTE Analysis</h1>
+            <p class="subtitle">Multi-Timeframe Options Analysis</p>
+        </div>
 
-            // Create new chart with RAW VALUES in labels
-            const ctx = document.getElementById('spiderChart').getContext('2d');
-            spiderChartInstance = new Chart(ctx, {
-                type: 'radar',
-                data: {
-                    labels: [
-                        `R/R: ${primaryData.raw_confidence}×${primaryData.raw_success_prob}`,
-                        `Pattern: ${primaryData.raw_pattern_strength}`,
-                        `P/C: ${(primaryData.raw_pc_ratio || 0).toFixed(2)}`,
-                        `Positioning: ${primaryData.smart_money_flow}`,
-                        `OI Proximity`,
-                        `Consensus: ${primaryData.cluster_consensus}%`
-                    ],
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                            padding: 12,
-                            titleColor: '#00ff88',
-                            bodyColor: '#e0e0e0',
-                            borderColor: '#2a3f5f',
-                            borderWidth: 1,
-                            displayColors: true,
-                            callbacks: {
-                                label: function(context) {
-                                    const label = context.dataset.label || '';
-                                    const value = context.parsed.r;
-                                    return `${label}: ${value}/100`;
-                                }
+        <div class="raw-metrics-panel">
+            <div class="panel-title">📊 Current Market State (Raw Data)</div>
+            <div class="metrics-grid">
+                ${rawMetricsHTML}
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="spiderChart"></canvas>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(0, 255, 136, 0.6);"></div>
+                <span class="legend-label">30 DTE (Short-term)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(255, 165, 0, 0.6);"></div>
+                <span class="legend-label">60 DTE (Medium-term)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(102, 126, 234, 0.6);"></div>
+                <span class="legend-label">90 DTE (Long-term)</span>
+            </div>
+        </div>
+
+        <div class="insights-panel">
+            <div class="insights-title">🎯 Key Insights</div>
+            <div class="insights-content">${insightsHTML}</div>
+        </div>
+    </div>
+
+    <script>
+        const primaryData = ${JSON.stringify(primaryData)};
+        const datasets = ${datasetsJSON};
+
+        const ctx = document.getElementById('spiderChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: [
+                    \`R/R: \${primaryData.raw_confidence}×\${primaryData.raw_success_prob}\`,
+                    \`Pattern: \${primaryData.raw_pattern_strength}\`,
+                    \`P/C: \${(primaryData.raw_pc_ratio || 0).toFixed(2)}\`,
+                    \`Positioning: \${primaryData.smart_money_flow}\`,
+                    'OI Proximity',
+                    \`Consensus: \${primaryData.cluster_consensus}%\`
+                ],
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                        padding: 12,
+                        titleColor: '#00ff88',
+                        bodyColor: '#e0e0e0',
+                        borderColor: '#2a3f5f',
+                        borderWidth: 1,
+                        displayColors: true,
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                const value = context.parsed.r;
+                                return \`\${label}: \${value}/100\`;
                             }
                         }
-                    },
-                    scales: {
-                        r: {
-                            min: 0,
-                            max: 100,
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 20,
-                                color: '#8892b0',
-                                backdropColor: 'transparent',
-                                font: { size: 12 }
-                            },
-                            grid: {
-                                color: 'rgba(42, 63, 95, 0.5)',
-                                circular: true
-                            },
-                            pointLabels: {
-                                color: '#00ff88',
-                                font: {
-                                    size: 12,
-                                    weight: 'bold'
-                                },
-                                padding: 15
-                            },
-                            angleLines: {
-                                color: 'rgba(42, 63, 95, 0.5)'
-                            }
-                        }
-                    },
-                    interaction: {
-                        mode: 'point',
-                        intersect: true
                     }
+                },
+                scales: {
+                    r: {
+                        min: 0,
+                        max: 100,
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 20,
+                            color: '#8892b0',
+                            backdropColor: 'transparent',
+                            font: { size: 12 }
+                        },
+                        grid: {
+                            color: 'rgba(42, 63, 95, 0.5)',
+                            circular: true
+                        },
+                        pointLabels: {
+                            color: '#00ff88',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            padding: 15
+                        },
+                        angleLines: {
+                            color: 'rgba(42, 63, 95, 0.5)'
+                        }
+                    }
+                },
+                interaction: {
+                    mode: 'point',
+                    intersect: true
                 }
-            });
+            }
+        });
+    </script>
+</body>
+</html>`;
 
-            // Generate insights
-            generateInsights(ticker, tickerData, dteList, insightsEl);
+            // Open in new tab
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
 
-            modal.classList.add('active');
+            // Clean up the URL after a short delay
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
         }
 
         function closeSpiderModal() {
