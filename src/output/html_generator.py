@@ -306,57 +306,84 @@ class HTMLGenerator:
             for trade in timeframe_trades:
                 dte = safe_int(trade.get("dte", 30))
 
-                # Extract and normalize metrics
+                # Extract base data
                 confidence = safe_int(trade.get("confidence", 0))
                 success_prob = safe_int(trade.get("success_probability", 0))
-
-                # Pattern strength: strong=90, moderate=60, weak=30
-                pattern_strength_map = {"strong": 90, "moderate": 60, "weak": 30}
                 pattern_analysis = trade.get("pattern_analysis", {})
+                smart_money = trade.get("smart_money_insights", {})
+
+                # === 1. RISK-REWARD SCORE (Expected Value) ===
+                # Combines confidence and success probability into single actionable metric
+                # Formula: (confidence * success_prob) / 100 to normalize to 0-100
+                risk_reward_score = int((confidence * success_prob) / 100) if confidence > 0 and success_prob > 0 else 0
+
+                # === 2. PATTERN STRENGTH ===
+                # Keep existing logic - works well
+                pattern_strength_map = {"strong": 90, "moderate": 60, "weak": 30}
                 pattern_strength_str = pattern_analysis.get("pattern_strength", "moderate")
                 pattern_strength = pattern_strength_map.get(pattern_strength_str, 60)
 
-                # OI Change % (normalized to 0-100 scale)
-                smart_money = trade.get("smart_money_insights", {})
+                # === 3. P/C RATIO SCORE (Continuous Normalization) ===
+                # Use smooth curve instead of buckets for better granularity
                 put_call_dynamics = smart_money.get("put_call_dynamics", {})
                 pc_ratio = put_call_dynamics.get("ratio", 1.0)
 
-                # Normalize P/C ratio change to 0-100 scale
-                # Ratio < 0.5 (very bullish) = 90+, Ratio > 2.0 (very bearish) = 10-
                 if isinstance(pc_ratio, (int, float)):
-                    if pc_ratio < 0.5:
-                        pc_score = 90
-                    elif pc_ratio < 0.8:
-                        pc_score = 75
-                    elif pc_ratio < 1.2:
-                        pc_score = 50
-                    elif pc_ratio < 1.5:
-                        pc_score = 30
+                    # Invert scale for direction alignment: low ratio (bullish calls) = high score
+                    # Use sigmoid-like transformation: score = 100 / (1 + ratio)
+                    # Ratio 0.3 -> 77, Ratio 0.5 -> 67, Ratio 1.0 -> 50, Ratio 2.0 -> 33, Ratio 3.0 -> 25
+                    if pc_ratio > 0:
+                        pc_score = int(100 / (1 + pc_ratio))
                     else:
-                        pc_score = 15
+                        pc_score = 100  # Extreme bullish
+
+                    # Ensure bounds
+                    pc_score = max(10, min(100, pc_score))
                 else:
                     pc_score = 50
 
-                # Smart Money Flow Score (based on flow analysis)
+                # === 4. SMART MONEY FLOW ===
+                # Enhanced with directional bias consideration
                 flow_analysis = smart_money.get("flow_analysis", {})
                 net_positioning = flow_analysis.get("net_positioning", "")
+                directional_bias = flow_analysis.get("directional_bias", "")
+
+                # Base score from positioning
                 if "BULLISH_CALL_ACCUMULATION" in str(net_positioning).upper():
                     smart_money_score = 95
                 elif "BEARISH_PUT_ACCUMULATION" in str(net_positioning).upper():
-                    smart_money_score = 85
+                    smart_money_score = 90
                 elif "BULLISH" in str(net_positioning).upper():
-                    smart_money_score = 70
+                    smart_money_score = 75
                 elif "BEARISH" in str(net_positioning).upper():
-                    smart_money_score = 65
+                    smart_money_score = 70
                 else:
                     smart_money_score = 50
 
+                # Adjust based on directional bias clarity
+                if "CALL_HEAVY" in str(directional_bias).upper() and smart_money_score >= 70:
+                    smart_money_score = min(100, smart_money_score + 5)
+                elif "PUT_HEAVY" in str(directional_bias).upper() and smart_money_score >= 70:
+                    smart_money_score = min(100, smart_money_score + 5)
+
+                # === 5. STRIKE DISTANCE SCORE ===
+                # Measures proximity to major OI concentrations
+                strike_distance_score = self._calculate_strike_distance_score(trade, smart_money)
+
+                # === 6. CLUSTER CONSENSUS STRENGTH ===
+                # Measures how tightly aligned this trade is with cluster members
+                cluster_consensus = self._calculate_cluster_consensus(trade, ticker_groups.get(ticker, []))
+
                 dte_metrics[str(dte)] = {
-                    "confidence_score": confidence,
-                    "success_probability": success_prob,
+                    "risk_reward_score": risk_reward_score,
                     "pattern_strength": pattern_strength,
                     "pc_ratio_score": pc_score,
                     "smart_money_flow": smart_money_score,
+                    "strike_distance_score": strike_distance_score,
+                    "cluster_consensus": cluster_consensus,
+                    # Keep raw values for debugging
+                    "raw_confidence": confidence,
+                    "raw_success_prob": success_prob,
                     "raw_pc_ratio": pc_ratio,
                     "raw_pattern_strength": pattern_strength_str
                 }
@@ -364,6 +391,147 @@ class HTMLGenerator:
             spider_data[ticker] = dte_metrics
 
         return spider_data
+
+    def _calculate_strike_distance_score(self, trade, smart_money):
+        """
+        Calculate strike distance score (0-100)
+        Measures proximity to major OI concentrations
+        Formula: 100 * (1 - abs(current_price - weighted_strike) / price_range)
+        """
+        try:
+            # Extract current price
+            current_price_str = trade.get("current_price", "0")
+            current_price = float(str(current_price_str).replace("$", "").replace(",", "")) if current_price_str else 0
+
+            if current_price <= 0:
+                return 50  # Neutral if no price data
+
+            # Get OI concentration zones
+            oi_zones = smart_money.get("oi_concentration_zones", {})
+            heavy_calls = oi_zones.get("heavy_call_strikes", [])
+            heavy_puts = oi_zones.get("heavy_put_strikes", [])
+
+            if not heavy_calls and not heavy_puts:
+                return 50  # Neutral if no concentration data
+
+            # Calculate weighted average strike based on direction
+            direction = trade.get("_direction", "CALL")
+            strikes_to_analyze = heavy_calls if direction == "CALL" else heavy_puts
+
+            if not strikes_to_analyze:
+                # Fallback to opposite direction if main direction has no data
+                strikes_to_analyze = heavy_puts if direction == "CALL" else heavy_calls
+
+            if not strikes_to_analyze:
+                return 50
+
+            # Calculate weighted average strike
+            total_oi = 0
+            weighted_strike_sum = 0
+
+            for strike_data in strikes_to_analyze:
+                strike = strike_data.get("strike", 0)
+                oi = strike_data.get("oi", 0)
+
+                # Clean and convert values
+                try:
+                    strike_val = float(str(strike).replace("$", "").replace(",", ""))
+                    oi_val = float(str(oi).replace(",", ""))
+
+                    total_oi += oi_val
+                    weighted_strike_sum += strike_val * oi_val
+                except (ValueError, TypeError):
+                    continue
+
+            if total_oi == 0:
+                return 50
+
+            weighted_strike = weighted_strike_sum / total_oi
+
+            # Calculate distance as percentage of current price
+            distance_pct = abs(current_price - weighted_strike) / current_price * 100
+
+            # Normalize to 0-100 score
+            # Distance < 2% = 90-100 (very close to concentration)
+            # Distance 2-5% = 70-90 (moderate proximity)
+            # Distance 5-10% = 40-70 (distant)
+            # Distance > 10% = 0-40 (very far)
+
+            if distance_pct < 2:
+                score = 100 - int(distance_pct * 5)  # 90-100 range
+            elif distance_pct < 5:
+                score = 90 - int((distance_pct - 2) * 6.67)  # 70-90 range
+            elif distance_pct < 10:
+                score = 70 - int((distance_pct - 5) * 6)  # 40-70 range
+            else:
+                score = max(0, 40 - int((distance_pct - 10) * 2))  # 0-40 range
+
+            return max(0, min(100, score))
+
+        except Exception as e:
+            print(f"Error calculating strike distance score: {e}")
+            return 50
+
+    def _calculate_cluster_consensus(self, trade, ticker_trades):
+        """
+        Calculate cluster consensus strength (0-100)
+        Measures how tightly aligned this trade is with other timeframes for same ticker
+        Higher score = stronger agreement across timeframes
+        """
+        try:
+            if len(ticker_trades) <= 1:
+                return 50  # Neutral if only one timeframe
+
+            # Get this trade's key metrics
+            current_confidence = safe_int(trade.get("confidence", 0))
+            current_pattern = trade.get("pattern_type", "")
+            current_direction = trade.get("_direction", "CALL")
+
+            # Calculate alignment with other timeframes
+            direction_matches = 0
+            pattern_matches = 0
+            confidence_diffs = []
+
+            for other_trade in ticker_trades:
+                if other_trade == trade:
+                    continue
+
+                # Direction alignment
+                other_direction = other_trade.get("_direction", "CALL")
+                if other_direction == current_direction:
+                    direction_matches += 1
+
+                # Pattern type alignment
+                other_pattern = other_trade.get("pattern_type", "")
+                if other_pattern == current_pattern:
+                    pattern_matches += 1
+
+                # Confidence proximity
+                other_confidence = safe_int(other_trade.get("confidence", 0))
+                confidence_diffs.append(abs(current_confidence - other_confidence))
+
+            total_other_trades = len(ticker_trades) - 1
+
+            # Calculate component scores
+            direction_score = (direction_matches / total_other_trades) * 100 if total_other_trades > 0 else 50
+            pattern_score = (pattern_matches / total_other_trades) * 100 if total_other_trades > 0 else 50
+
+            # Confidence alignment score (inverse of average difference)
+            avg_confidence_diff = sum(confidence_diffs) / len(confidence_diffs) if confidence_diffs else 0
+            confidence_score = max(0, 100 - avg_confidence_diff)
+
+            # Weighted average: direction is most important, then confidence, then pattern
+            consensus_score = int(
+                direction_score * 0.5 +
+                confidence_score * 0.3 +
+                pattern_score * 0.2
+            )
+
+            return max(0, min(100, consensus_score))
+
+        except Exception as e:
+            print(f"Error calculating cluster consensus: {e}")
+            return 50
 
     def _prepare_gamma_squeeze_data(self, clusters):
         """Prepare gamma squeeze analysis data for dashboard"""
@@ -2212,6 +2380,7 @@ class HTMLGenerator:
             const modal = document.getElementById('spiderModal');
             const titleEl = document.getElementById('spider-title');
             const insightsEl = document.getElementById('spider-insights');
+            const rawMetricsGrid = document.getElementById('raw-metrics-grid');
 
             titleEl.textContent = `${ticker} - DTE Analysis`;
 
@@ -2221,11 +2390,58 @@ class HTMLGenerator:
             }
 
             const tickerData = spiderChartData[ticker];
+            const dteList = Object.keys(tickerData).sort((a, b) => parseInt(a) - parseInt(b));
+
+            // Get primary timeframe data (30 DTE) for raw metrics display
+            const primaryData = tickerData[dteList[0]];
+
+            // Populate raw metrics panel
+            rawMetricsGrid.innerHTML = `
+                <div style="background: rgba(26, 31, 46, 0.8); border: 1px solid #2a3f5f; border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 11px; color: #8892b0; margin-bottom: 5px;">Put/Call Ratio</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #4caf50;">${(primaryData.raw_pc_ratio || 0).toFixed(2)}</div>
+                    <div style="font-size: 12px; color: #c0c0c0; margin-top: 5px;">${primaryData.raw_pc_ratio < 0.7 ? 'Strong call bias' : primaryData.raw_pc_ratio > 1.3 ? 'Strong put bias' : 'Neutral'}</div>
+                    <span style="display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; margin-top: 5px; background: rgba(76, 175, 80, 0.2); color: #4caf50;">Score: ${primaryData.pc_ratio_score}/100</span>
+                </div>
+
+                <div style="background: rgba(26, 31, 46, 0.8); border: 1px solid #2a3f5f; border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 11px; color: #8892b0; margin-bottom: 5px;">Risk/Reward</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #fff;">${primaryData.risk_reward_score}/100</div>
+                    <div style="font-size: 12px; color: #c0c0c0; margin-top: 5px;">Confidence: ${primaryData.raw_confidence}%<br>Success: ${primaryData.raw_success_prob}%</div>
+                    <span style="display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; margin-top: 5px; background: rgba(0, 255, 136, 0.2); color: #00ff88;">Expected Value</span>
+                </div>
+
+                <div style="background: rgba(26, 31, 46, 0.8); border: 1px solid #2a3f5f; border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 11px; color: #8892b0; margin-bottom: 5px;">Pattern Strength</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #fff;">${primaryData.raw_pattern_strength}</div>
+                    <div style="font-size: 12px; color: #c0c0c0; margin-top: 5px;">Technical reliability</div>
+                    <span style="display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; margin-top: 5px; background: rgba(255, 165, 0, 0.2); color: #ffaa00;">Score: ${primaryData.pattern_strength}/100</span>
+                </div>
+
+                <div style="background: rgba(26, 31, 46, 0.8); border: 1px solid #2a3f5f; border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 11px; color: #8892b0; margin-bottom: 5px;">Smart Money Positioning</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #fff;">${primaryData.smart_money_flow}/100</div>
+                    <div style="font-size: 12px; color: #c0c0c0; margin-top: 5px;">Institutional positioning score</div>
+                    <span style="display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; margin-top: 5px; background: rgba(102, 126, 234, 0.2); color: #667eea;">${primaryData.smart_money_flow >= 80 ? 'Strong' : 'Moderate'}</span>
+                </div>
+
+                <div style="background: rgba(26, 31, 46, 0.8); border: 1px solid #2a3f5f; border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 11px; color: #8892b0; margin-bottom: 5px;">OI Proximity</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #fff;">${primaryData.strike_distance_score}/100</div>
+                    <div style="font-size: 12px; color: #c0c0c0; margin-top: 5px;">Distance to major strikes</div>
+                    <span style="display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; margin-top: 5px; background: rgba(255, 170, 0, 0.2); color: #ffaa00;">${primaryData.strike_distance_score >= 90 ? '<2% away' : primaryData.strike_distance_score >= 70 ? '2-5% away' : '>5% away'}</span>
+                </div>
+
+                <div style="background: rgba(26, 31, 46, 0.8); border: 1px solid #2a3f5f; border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 11px; color: #8892b0; margin-bottom: 5px;">Timeframe Consensus</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #fff;">${primaryData.cluster_consensus}/100</div>
+                    <div style="font-size: 12px; color: #c0c0c0; margin-top: 5px;">Multi-DTE alignment</div>
+                    <span style="display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; margin-top: 5px; background: rgba(0, 255, 136, 0.2); color: #00ff88;">${primaryData.cluster_consensus >= 80 ? 'Aligned' : 'Partial'}</span>
+                </div>
+            `;
 
             // Prepare datasets
             const datasets = [];
-            const dteList = Object.keys(tickerData).sort((a, b) => parseInt(a) - parseInt(b));
-
             const colors = {
                 '30': { bg: 'rgba(0, 255, 136, 0.15)', border: 'rgba(0, 255, 136, 0.8)', point: 'rgba(0, 255, 136, 1)' },
                 '60': { bg: 'rgba(255, 165, 0, 0.15)', border: 'rgba(255, 165, 0, 0.8)', point: 'rgba(255, 165, 0, 1)' },
@@ -2239,11 +2455,12 @@ class HTMLGenerator:
                 datasets.push({
                     label: `${dte} DTE`,
                     data: [
-                        data.confidence_score,
-                        data.success_probability,
+                        data.risk_reward_score,
                         data.pattern_strength,
                         data.pc_ratio_score,
-                        data.smart_money_flow
+                        data.smart_money_flow,
+                        data.strike_distance_score,
+                        data.cluster_consensus
                     ],
                     fill: true,
                     backgroundColor: color.bg,
@@ -2262,17 +2479,18 @@ class HTMLGenerator:
                 spiderChartInstance.destroy();
             }
 
-            // Create new chart
+            // Create new chart with RAW VALUES in labels
             const ctx = document.getElementById('spiderChart').getContext('2d');
             spiderChartInstance = new Chart(ctx, {
                 type: 'radar',
                 data: {
                     labels: [
-                        'Confidence Score',
-                        'Success Probability',
-                        'Pattern Strength',
-                        'P/C Ratio Score',
-                        'Smart Money Flow'
+                        `R/R: ${primaryData.raw_confidence}×${primaryData.raw_success_prob}`,
+                        `Pattern: ${primaryData.raw_pattern_strength}`,
+                        `P/C: ${(primaryData.raw_pc_ratio || 0).toFixed(2)}`,
+                        `Positioning: ${primaryData.smart_money_flow}`,
+                        `OI Proximity`,
+                        `Consensus: ${primaryData.cluster_consensus}%`
                     ],
                     datasets: datasets
                 },
@@ -2290,7 +2508,14 @@ class HTMLGenerator:
                             bodyColor: '#e0e0e0',
                             borderColor: '#2a3f5f',
                             borderWidth: 1,
-                            displayColors: true
+                            displayColors: true,
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.r;
+                                    return `${label}: ${value}/100`;
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -2311,7 +2536,7 @@ class HTMLGenerator:
                             pointLabels: {
                                 color: '#00ff88',
                                 font: {
-                                    size: 14,
+                                    size: 12,
                                     weight: 'bold'
                                 },
                                 padding: 15
@@ -2341,26 +2566,26 @@ class HTMLGenerator:
         function generateInsights(ticker, data, dteList, element) {
             const insights = [];
 
-            // Calculate confluence
-            const avgConfidences = dteList.map(dte => data[dte].confidence_score);
+            // Calculate confluence using raw confidence data
+            const avgConfidences = dteList.map(dte => data[dte].raw_confidence || 0);
             const avgConf = avgConfidences.reduce((a, b) => a + b, 0) / avgConfidences.length;
 
             if (avgConf >= 80) {
-                insights.push(`✓ <strong>Strong Confluence:</strong> All timeframes show bullish alignment with ${avgConf.toFixed(0)}% average confidence`);
+                insights.push(`✓ <strong>Strong Confluence:</strong> All timeframes show strong alignment with ${avgConf.toFixed(0)}% average confidence`);
             } else if (avgConf >= 60) {
                 insights.push(`✓ <strong>Moderate Confluence:</strong> Timeframes show ${avgConf.toFixed(0)}% average confidence`);
             } else {
                 insights.push(`⚠ <strong>Weak Confluence:</strong> Mixed signals with ${avgConf.toFixed(0)}% average confidence`);
             }
 
-            // Find best DTE
+            // Find best DTE using risk-reward score
             const bestDTE = dteList.reduce((best, dte) => {
-                const score = data[dte].confidence_score * data[dte].success_probability;
-                const bestScore = data[best].confidence_score * data[best].success_probability;
+                const score = data[dte].risk_reward_score || 0;
+                const bestScore = data[best].risk_reward_score || 0;
                 return score > bestScore ? dte : best;
             });
 
-            insights.push(`✓ <strong>Best Entry:</strong> ${bestDTE} DTE shows optimal balance of confidence (${data[bestDTE].confidence_score}%) and success probability (${data[bestDTE].success_probability}%)`);
+            insights.push(`✓ <strong>Best Entry:</strong> ${bestDTE} DTE shows highest risk-reward score (${data[bestDTE].risk_reward_score})`);
 
             // Smart money analysis
             const smartMoneyScores = dteList.map(dte => data[dte].smart_money_flow);
@@ -2370,6 +2595,18 @@ class HTMLGenerator:
                 insights.push(`✓ <strong>Smart Money:</strong> Consistent institutional positioning across all timeframes (${avgSmartMoney.toFixed(0)}/100)`);
             } else if (avgSmartMoney >= 60) {
                 insights.push(`⚠ <strong>Smart Money:</strong> Moderate institutional interest (${avgSmartMoney.toFixed(0)}/100)`);
+            }
+
+            // Cluster consensus insight
+            const avgConsensus = dteList.map(dte => data[dte].cluster_consensus).reduce((a, b) => a + b, 0) / dteList.length;
+            if (avgConsensus >= 80) {
+                insights.push(`✓ <strong>Timeframe Alignment:</strong> All DTEs show consistent positioning (${avgConsensus.toFixed(0)}/100 consensus)`);
+            }
+
+            // Strike proximity insight
+            const avgStrikeDistance = dteList.map(dte => data[dte].strike_distance_score).reduce((a, b) => a + b, 0) / dteList.length;
+            if (avgStrikeDistance >= 80) {
+                insights.push(`✓ <strong>Strike Positioning:</strong> Price very close to major OI concentrations - high gamma impact potential`);
             }
 
             element.innerHTML = insights.join('<br><br>');
@@ -2410,9 +2647,17 @@ class HTMLGenerator:
         <div class="spider-content">
             <button class="spider-close-btn" onclick="closeSpiderModal()">×</button>
 
-            <div style="text-align: center; margin-bottom: 30px;">
+            <div style="text-align: center; margin-bottom: 20px;">
                 <h2 id="spider-title" style="font-size: 28px; color: #00ff88; margin-bottom: 8px;"></h2>
                 <p style="font-size: 14px; color: #8892b0;">Multi-Timeframe DTE Analysis</p>
+            </div>
+
+            <!-- RAW METRICS PANEL -->
+            <div id="raw-metrics-panel" style="background: rgba(0, 255, 136, 0.05); border: 2px solid rgba(0, 255, 136, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 25px;">
+                <h3 style="color: #00ff88; font-size: 16px; margin-bottom: 15px; text-align: center;">📊 Current Market State (Raw Data)</h3>
+                <div id="raw-metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <!-- Will be populated dynamically -->
+                </div>
             </div>
 
             <div class="spider-chart-container">
@@ -2422,15 +2667,15 @@ class HTMLGenerator:
             <div style="display: flex; justify-content: center; gap: 30px; margin-top: 20px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 10px; background: rgba(42, 63, 95, 0.3); padding: 10px 20px; border-radius: 8px;">
                     <div style="width: 20px; height: 20px; background: rgba(0, 255, 136, 0.6); border-radius: 4px;"></div>
-                    <span style="font-size: 14px; font-weight: 600;">30 DTE (Short-term)</span>
+                    <span style="font-size: 14px; font-weight: 600;">30 DTE</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px; background: rgba(42, 63, 95, 0.3); padding: 10px 20px; border-radius: 8px;">
                     <div style="width: 20px; height: 20px; background: rgba(255, 165, 0, 0.6); border-radius: 4px;"></div>
-                    <span style="font-size: 14px; font-weight: 600;">60 DTE (Medium-term)</span>
+                    <span style="font-size: 14px; font-weight: 600;">60 DTE</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px; background: rgba(42, 63, 95, 0.3); padding: 10px 20px; border-radius: 8px;">
                     <div style="width: 20px; height: 20px; background: rgba(102, 126, 234, 0.6); border-radius: 4px;"></div>
-                    <span style="font-size: 14px; font-weight: 600;">90 DTE (Long-term)</span>
+                    <span style="font-size: 14px; font-weight: 600;">90 DTE</span>
                 </div>
             </div>
 
