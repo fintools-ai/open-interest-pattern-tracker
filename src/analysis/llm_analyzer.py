@@ -149,12 +149,14 @@ Adjust weights based on market conditions and data quality:
 CRITICAL OUTPUT FORMATTING RULES:
 1. For ALL price fields (entry_price, target_price, stop_loss), use STOCK PRICES not option premiums
 2. Provide ONLY numeric values without $ signs (e.g., 175.50 not $175.50)
-3. For percentage fields, provide ONLY numeric values without % signs (e.g., 75 not 75%)
+3. For percentage fields (success_probability, confidence_score), provide ONLY numeric values without % signs (e.g., 75 not 75%)
 4. entry_price = the STOCK price level for entering the trade
 5. target_price = the STOCK price target where you'd take profits
 6. stop_loss = the STOCK price level where you'd exit at a loss
 7. Extract current stock price from technical data and put in current_price as plain number
 8. **CRITICAL**: days_to_expiry MUST be set to {dte_period} (the exact value provided above)
+9. **MANDATORY**: confidence_score MUST be a numeric integer between 0-100 (e.g., 75, not "75%", not "high")
+10. **MANDATORY**: success_probability MUST be a numeric integer between 0-100 (e.g., 65, not "65%")
 
 IMPORTANT: ALL prices should be STOCK prices, not option premiums. This makes it clear where the underlying stock should be for entry/exit.
 
@@ -190,7 +192,7 @@ Return JSON with this enhanced structure that extracts MAXIMUM intelligence from
     "pattern_type": "institutional_accumulation|short_squeeze_setup|gamma_squeeze_setup|distribution|protective_hedging|other",
     "pattern_strength": "strong|moderate|weak",
     "supporting_evidence": ["evidence1", "evidence2"],
-    "confidence_score": "Calculate based on OI strength and technical confluence",
+    "confidence_score": 75,
     "oi_intelligence": {{
       "strike_concentration": "Key strikes with unusual OI buildup",
       "flow_direction": "Institutional buying/selling/hedging",

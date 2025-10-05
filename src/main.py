@@ -252,6 +252,7 @@ class OIPatternTracker:
                     # Add timeframe metadata to analysis result
                     analysis["dte_period"] = dte_period
                     analysis["timeframe_id"] = f"{ticker}_{dte_period}DTE"
+                    analysis["delta_data"] = ticker_result["delta"]
 
                     print(f"    Analysis result: {analysis.get('status', 'unknown')}")
 

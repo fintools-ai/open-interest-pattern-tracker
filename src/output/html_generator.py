@@ -134,6 +134,7 @@ class HTMLGenerator:
         multi_timeframe_data = self._prepare_multi_timeframe_data(clusters)
         timeframe_comparison = self._prepare_timeframe_comparison_table(clusters)
         confluence_summary = self._prepare_confluence_summary(clusters)
+        spider_chart_data = self._prepare_spider_chart_data(clusters)
 
         template_data = {
             # Header stats
@@ -170,7 +171,10 @@ class HTMLGenerator:
             "multi_timeframe_trades": multi_timeframe_data,
             "timeframe_comparison": timeframe_comparison,
             "confluence_summary": confluence_summary,
-            "has_multi_timeframe": bool(clusters.get("multi_timeframe", {}).get("by_ticker"))
+            "has_multi_timeframe": bool(clusters.get("multi_timeframe", {}).get("by_ticker")),
+
+            # Spider chart data
+            "spider_chart_data": json.dumps(spider_chart_data)
         }
 
         return template_data
@@ -273,10 +277,98 @@ class HTMLGenerator:
             "notable_divergences": confluence_summary.get("notable_divergences", [])
         }
     
+    def _prepare_spider_chart_data(self, clusters):
+        """Prepare spider chart data for multi-timeframe DTE analysis"""
+        # Collect all trades across timeframes with direction info
+        all_trades = []
+        for group in ["bullish_group", "bearish_group"]:
+            if group in clusters:
+                for trade in clusters[group]["tickers"]:
+                    trade["_direction"] = "CALL" if group == "bullish_group" else "PUT"
+                    all_trades.append(trade)
+
+        # Group by ticker
+        ticker_groups = {}
+        for trade in all_trades:
+            ticker = trade["ticker"]
+            if ticker not in ticker_groups:
+                ticker_groups[ticker] = []
+            ticker_groups[ticker].append(trade)
+
+        # Prepare spider chart data for each ticker
+        spider_data = {}
+        for ticker, timeframe_trades in ticker_groups.items():
+            # Sort by DTE
+            timeframe_trades.sort(key=lambda x: safe_int(x.get("dte", 30)))
+
+            # Prepare metrics for each DTE
+            dte_metrics = {}
+            for trade in timeframe_trades:
+                dte = safe_int(trade.get("dte", 30))
+
+                # Extract and normalize metrics
+                confidence = safe_int(trade.get("confidence", 0))
+                success_prob = safe_int(trade.get("success_probability", 0))
+
+                # Pattern strength: strong=90, moderate=60, weak=30
+                pattern_strength_map = {"strong": 90, "moderate": 60, "weak": 30}
+                pattern_analysis = trade.get("pattern_analysis", {})
+                pattern_strength_str = pattern_analysis.get("pattern_strength", "moderate")
+                pattern_strength = pattern_strength_map.get(pattern_strength_str, 60)
+
+                # OI Change % (normalized to 0-100 scale)
+                smart_money = trade.get("smart_money_insights", {})
+                put_call_dynamics = smart_money.get("put_call_dynamics", {})
+                pc_ratio = put_call_dynamics.get("ratio", 1.0)
+
+                # Normalize P/C ratio change to 0-100 scale
+                # Ratio < 0.5 (very bullish) = 90+, Ratio > 2.0 (very bearish) = 10-
+                if isinstance(pc_ratio, (int, float)):
+                    if pc_ratio < 0.5:
+                        pc_score = 90
+                    elif pc_ratio < 0.8:
+                        pc_score = 75
+                    elif pc_ratio < 1.2:
+                        pc_score = 50
+                    elif pc_ratio < 1.5:
+                        pc_score = 30
+                    else:
+                        pc_score = 15
+                else:
+                    pc_score = 50
+
+                # Smart Money Flow Score (based on flow analysis)
+                flow_analysis = smart_money.get("flow_analysis", {})
+                net_positioning = flow_analysis.get("net_positioning", "")
+                if "BULLISH_CALL_ACCUMULATION" in str(net_positioning).upper():
+                    smart_money_score = 95
+                elif "BEARISH_PUT_ACCUMULATION" in str(net_positioning).upper():
+                    smart_money_score = 85
+                elif "BULLISH" in str(net_positioning).upper():
+                    smart_money_score = 70
+                elif "BEARISH" in str(net_positioning).upper():
+                    smart_money_score = 65
+                else:
+                    smart_money_score = 50
+
+                dte_metrics[str(dte)] = {
+                    "confidence_score": confidence,
+                    "success_probability": success_prob,
+                    "pattern_strength": pattern_strength,
+                    "pc_ratio_score": pc_score,
+                    "smart_money_flow": smart_money_score,
+                    "raw_pc_ratio": pc_ratio,
+                    "raw_pattern_strength": pattern_strength_str
+                }
+
+            spider_data[ticker] = dte_metrics
+
+        return spider_data
+
     def _prepare_gamma_squeeze_data(self, clusters):
         """Prepare gamma squeeze analysis data for dashboard"""
         gamma_setups = []
-        
+
         # Process all tickers from both bullish and bearish clusters
         all_tickers = clusters["bullish_group"]["tickers"] + clusters["bearish_group"]["tickers"]
         
@@ -740,14 +832,16 @@ class HTMLGenerator:
 
             directions.append(direction)
 
-            # Extract confidence
-            confidence_str = str(trade.get("confidence", "50")).replace("%", "")
-            try:
-                confidence = float(confidence_str)
-            except ValueError:
-                confidence = 50.0  # Default confidence
-
-            confidences.append(confidence)
+            # Extract confidence - don't default if missing
+            confidence_raw = trade.get("confidence")
+            if confidence_raw is not None:
+                confidence_str = str(confidence_raw).replace("%", "")
+                try:
+                    confidence = float(confidence_str)
+                    confidences.append(confidence)
+                except ValueError:
+                    # Invalid confidence format - skip it
+                    pass
 
         # Count directions
         bullish_count = directions.count("bullish")
@@ -769,11 +863,15 @@ class HTMLGenerator:
             confluence_status = "partial"
 
         # Calculate weighted average confidence
-        avg_confidence = sum(confidences) / len(confidences) if confidences else 50.0
+        if confidences:
+            avg_confidence = sum(confidences) / len(confidences)
+            confidence_str = f"{avg_confidence:.0f}%"
+        else:
+            confidence_str = "Not sure"
 
         return {
             "direction": consensus_direction,
-            "confidence": f"{avg_confidence:.0f}%",
+            "confidence": confidence_str,
             "confluence_status": confluence_status
         }
     
@@ -861,6 +959,7 @@ class HTMLGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OI Pattern Tracker - Daily Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #e0e0e0; line-height: 1.5; }
@@ -1015,6 +1114,66 @@ class HTMLGenerator:
         .flip-arrow { font-size: 16px; }
         .footer { text-align: center; padding: 20px; border-top: 1px solid #333; margin-top: 40px; color: #666; font-size: 12px; }
         .last-update { color: #888; font-size: 11px; text-align: right; margin-top: 10px; }
+
+        /* Spider Chart Modal */
+        .spider-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .spider-modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spider-content {
+            background: linear-gradient(135deg, #1a1f2e 0%, #151922 100%);
+            border: 2px solid #2a3f5f;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 1000px;
+            width: 100%;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        }
+
+        .spider-close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 68, 68, 0.2);
+            border: 1px solid #ff4444;
+            color: #ff4444;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .spider-close-btn:hover {
+            background: rgba(255, 68, 68, 0.3);
+            transform: rotate(90deg);
+        }
+
+        .spider-chart-container {
+            position: relative;
+            height: 500px;
+            margin-bottom: 30px;
+        }
     </style>
 </head>
 <body>
@@ -1930,10 +2089,14 @@ class HTMLGenerator:
                     </div>
 
                     <!-- Interactive Analysis Button -->
-                    <div style="padding: 15px; border-top: 1px solid #333;">
-                        <button class="interactive-analysis-btn"
+                    <div style="padding: 15px; border-top: 1px solid #333; display: flex; gap: 10px;">
+                        <button class="interactive-analysis-btn" style="flex: 1;"
                                 onclick="openInteractiveAnalysis('{{trade.ticker}}', '{{trade.consensus_direction}}')">
                             Start Interactive Analysis
+                        </button>
+                        <button class="interactive-analysis-btn" style="flex: 1; background: rgba(102, 126, 234, 0.05); border-color: rgba(102, 126, 234, 0.3); color: #667eea;"
+                                onclick="openSpiderChart('{{trade.ticker}}')">
+                            📊 View DTE Analysis
                         </button>
                     </div>
                 </div>
@@ -2041,6 +2204,192 @@ class HTMLGenerator:
             if (selectedPanel) selectedPanel.classList.add('active');
         }
 
+        // Spider chart data from backend
+        const spiderChartData = JSON.parse('{{spider_chart_data|safe}}');
+        let spiderChartInstance = null;
+
+        function openSpiderChart(ticker) {
+            const modal = document.getElementById('spiderModal');
+            const titleEl = document.getElementById('spider-title');
+            const insightsEl = document.getElementById('spider-insights');
+
+            titleEl.textContent = `${ticker} - DTE Analysis`;
+
+            if (!spiderChartData[ticker]) {
+                alert(`No multi-timeframe data available for ${ticker}`);
+                return;
+            }
+
+            const tickerData = spiderChartData[ticker];
+
+            // Prepare datasets
+            const datasets = [];
+            const dteList = Object.keys(tickerData).sort((a, b) => parseInt(a) - parseInt(b));
+
+            const colors = {
+                '30': { bg: 'rgba(0, 255, 136, 0.15)', border: 'rgba(0, 255, 136, 0.8)', point: 'rgba(0, 255, 136, 1)' },
+                '60': { bg: 'rgba(255, 165, 0, 0.15)', border: 'rgba(255, 165, 0, 0.8)', point: 'rgba(255, 165, 0, 1)' },
+                '90': { bg: 'rgba(102, 126, 234, 0.15)', border: 'rgba(102, 126, 234, 0.8)', point: 'rgba(102, 126, 234, 1)' }
+            };
+
+            dteList.forEach(dte => {
+                const data = tickerData[dte];
+                const color = colors[dte] || { bg: 'rgba(255, 255, 255, 0.15)', border: 'rgba(255, 255, 255, 0.8)', point: 'rgba(255, 255, 255, 1)' };
+
+                datasets.push({
+                    label: `${dte} DTE`,
+                    data: [
+                        data.confidence_score,
+                        data.success_probability,
+                        data.pattern_strength,
+                        data.pc_ratio_score,
+                        data.smart_money_flow
+                    ],
+                    fill: true,
+                    backgroundColor: color.bg,
+                    borderColor: color.border,
+                    borderWidth: 3,
+                    pointBackgroundColor: color.point,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                });
+            });
+
+            // Destroy existing chart if any
+            if (spiderChartInstance) {
+                spiderChartInstance.destroy();
+            }
+
+            // Create new chart
+            const ctx = document.getElementById('spiderChart').getContext('2d');
+            spiderChartInstance = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: [
+                        'Confidence Score',
+                        'Success Probability',
+                        'Pattern Strength',
+                        'P/C Ratio Score',
+                        'Smart Money Flow'
+                    ],
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                            padding: 12,
+                            titleColor: '#00ff88',
+                            bodyColor: '#e0e0e0',
+                            borderColor: '#2a3f5f',
+                            borderWidth: 1,
+                            displayColors: true
+                        }
+                    },
+                    scales: {
+                        r: {
+                            min: 0,
+                            max: 100,
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 20,
+                                color: '#8892b0',
+                                backdropColor: 'transparent',
+                                font: { size: 12 }
+                            },
+                            grid: {
+                                color: 'rgba(42, 63, 95, 0.5)',
+                                circular: true
+                            },
+                            pointLabels: {
+                                color: '#00ff88',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                padding: 15
+                            },
+                            angleLines: {
+                                color: 'rgba(42, 63, 95, 0.5)'
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'point',
+                        intersect: true
+                    }
+                }
+            });
+
+            // Generate insights
+            generateInsights(ticker, tickerData, dteList, insightsEl);
+
+            modal.classList.add('active');
+        }
+
+        function closeSpiderModal() {
+            document.getElementById('spiderModal').classList.remove('active');
+        }
+
+        function generateInsights(ticker, data, dteList, element) {
+            const insights = [];
+
+            // Calculate confluence
+            const avgConfidences = dteList.map(dte => data[dte].confidence_score);
+            const avgConf = avgConfidences.reduce((a, b) => a + b, 0) / avgConfidences.length;
+
+            if (avgConf >= 80) {
+                insights.push(`✓ <strong>Strong Confluence:</strong> All timeframes show bullish alignment with ${avgConf.toFixed(0)}% average confidence`);
+            } else if (avgConf >= 60) {
+                insights.push(`✓ <strong>Moderate Confluence:</strong> Timeframes show ${avgConf.toFixed(0)}% average confidence`);
+            } else {
+                insights.push(`⚠ <strong>Weak Confluence:</strong> Mixed signals with ${avgConf.toFixed(0)}% average confidence`);
+            }
+
+            // Find best DTE
+            const bestDTE = dteList.reduce((best, dte) => {
+                const score = data[dte].confidence_score * data[dte].success_probability;
+                const bestScore = data[best].confidence_score * data[best].success_probability;
+                return score > bestScore ? dte : best;
+            });
+
+            insights.push(`✓ <strong>Best Entry:</strong> ${bestDTE} DTE shows optimal balance of confidence (${data[bestDTE].confidence_score}%) and success probability (${data[bestDTE].success_probability}%)`);
+
+            // Smart money analysis
+            const smartMoneyScores = dteList.map(dte => data[dte].smart_money_flow);
+            const avgSmartMoney = smartMoneyScores.reduce((a, b) => a + b, 0) / smartMoneyScores.length;
+
+            if (avgSmartMoney >= 80) {
+                insights.push(`✓ <strong>Smart Money:</strong> Consistent institutional positioning across all timeframes (${avgSmartMoney.toFixed(0)}/100)`);
+            } else if (avgSmartMoney >= 60) {
+                insights.push(`⚠ <strong>Smart Money:</strong> Moderate institutional interest (${avgSmartMoney.toFixed(0)}/100)`);
+            }
+
+            element.innerHTML = insights.join('<br><br>');
+        }
+
+        // Close modal on background click
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('spiderModal');
+            if (e.target === modal) {
+                closeSpiderModal();
+            }
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSpiderModal();
+            }
+        });
+
         // Add startup notification
         document.addEventListener('DOMContentLoaded', function() {
             // Check if interactive service is running
@@ -2055,6 +2404,42 @@ class HTMLGenerator:
             });
         });
     </script>
+
+    <!-- Spider Chart Modal -->
+    <div class="spider-modal" id="spiderModal">
+        <div class="spider-content">
+            <button class="spider-close-btn" onclick="closeSpiderModal()">×</button>
+
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h2 id="spider-title" style="font-size: 28px; color: #00ff88; margin-bottom: 8px;"></h2>
+                <p style="font-size: 14px; color: #8892b0;">Multi-Timeframe DTE Analysis</p>
+            </div>
+
+            <div class="spider-chart-container">
+                <canvas id="spiderChart"></canvas>
+            </div>
+
+            <div style="display: flex; justify-content: center; gap: 30px; margin-top: 20px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 10px; background: rgba(42, 63, 95, 0.3); padding: 10px 20px; border-radius: 8px;">
+                    <div style="width: 20px; height: 20px; background: rgba(0, 255, 136, 0.6); border-radius: 4px;"></div>
+                    <span style="font-size: 14px; font-weight: 600;">30 DTE (Short-term)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; background: rgba(42, 63, 95, 0.3); padding: 10px 20px; border-radius: 8px;">
+                    <div style="width: 20px; height: 20px; background: rgba(255, 165, 0, 0.6); border-radius: 4px;"></div>
+                    <span style="font-size: 14px; font-weight: 600;">60 DTE (Medium-term)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; background: rgba(42, 63, 95, 0.3); padding: 10px 20px; border-radius: 8px;">
+                    <div style="width: 20px; height: 20px; background: rgba(102, 126, 234, 0.6); border-radius: 4px;"></div>
+                    <span style="font-size: 14px; font-weight: 600;">90 DTE (Long-term)</span>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; padding: 20px; background: rgba(42, 63, 95, 0.2); border-radius: 12px; border-left: 4px solid #00ff88;">
+                <div style="font-size: 18px; color: #00ff88; margin-bottom: 15px; font-weight: 600;">🎯 Key Insights</div>
+                <div id="spider-insights" style="font-size: 14px; color: #c0c0c0; line-height: 1.8;"></div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>'''
         

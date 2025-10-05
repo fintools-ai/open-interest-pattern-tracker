@@ -129,7 +129,7 @@ class ClusteringEngine:
         pattern_analysis = analysis.get("pattern_analysis", {})
         market_summary = analysis.get("market_summary", {})
         technical_analysis = analysis.get("technical_analysis", {})
-        
+
         return {
             "ticker": analysis.get("ticker", "UNKNOWN"),
             "confidence": pattern_analysis.get("confidence_score", 0),
@@ -160,7 +160,9 @@ class ClusteringEngine:
             "volume_analysis": technical_analysis.get("volume_analysis", "Institutional flow detected"),
             "multi_timeframe_summary": technical_analysis.get("multi_timeframe_summary", "Trend alignment confirmed"),
             # Enhanced smart money insights
-            "smart_money_insights": analysis.get("smart_money_insights", {})
+            "smart_money_insights": analysis.get("smart_money_insights", {}),
+            # Delta data for metrics calculation
+            "delta_data": analysis.get("delta_data", {})
         }
     
     def _calculate_group_stats(self, clusters):
