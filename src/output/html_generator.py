@@ -138,10 +138,10 @@ class HTMLGenerator:
 
         template_data = {
             # Header stats
-            "patterns_found": len(clusters["bullish_group"]["pattern_types"]) + len(clusters["bearish_group"]["pattern_types"]),
+            "patterns_found": len(clusters["bullish_group"]["pattern_types"]) + len(clusters["bearish_group"]["pattern_types"]) + len(clusters.get("unclear_group", {}).get("pattern_types", {})),
             "stocks_analyzed": clusters["total_analyzed"],
             "avg_success_rate": self._calculate_overall_success_rate(clusters),
-            "active_signals": clusters["bullish_group"]["total_count"] + clusters["bearish_group"]["total_count"],
+            "active_signals": clusters["bullish_group"]["total_count"] + clusters["bearish_group"]["total_count"] + clusters.get("unclear_group", {}).get("total_count", 0),
             "last_update": datetime.now().strftime("%B %d, %Y at %I:%M %p ET"),
 
             # Market pulse data
@@ -166,6 +166,7 @@ class HTMLGenerator:
             # Clustering summary
             "bullish_count": clusters["bullish_group"]["total_count"],
             "bearish_count": clusters["bearish_group"]["total_count"],
+            "unclear_count": clusters.get("unclear_group", {}).get("total_count", 0),
 
             # Multi-timeframe data
             "multi_timeframe_trades": multi_timeframe_data,
@@ -281,10 +282,15 @@ class HTMLGenerator:
         """Prepare spider chart data for multi-timeframe DTE analysis"""
         # Collect all trades across timeframes with direction info
         all_trades = []
-        for group in ["bullish_group", "bearish_group"]:
+        for group in ["bullish_group", "bearish_group", "unclear_group"]:
             if group in clusters:
                 for trade in clusters[group]["tickers"]:
-                    trade["_direction"] = "CALL" if group == "bullish_group" else "PUT"
+                    if group == "bullish_group":
+                        trade["_direction"] = "CALL"
+                    elif group == "bearish_group":
+                        trade["_direction"] = "PUT"
+                    else:
+                        trade["_direction"] = "UNCLEAR"
                     all_trades.append(trade)
 
         # Group by ticker
@@ -537,9 +543,9 @@ class HTMLGenerator:
         """Prepare gamma squeeze analysis data for dashboard"""
         gamma_setups = []
 
-        # Process all tickers from both bullish and bearish clusters
-        all_tickers = clusters["bullish_group"]["tickers"] + clusters["bearish_group"]["tickers"]
-        
+        # Process all tickers from bullish, bearish, and unclear clusters
+        all_tickers = clusters["bullish_group"]["tickers"] + clusters["bearish_group"]["tickers"] + clusters.get("unclear_group", {}).get("tickers", [])
+
         for ticker in all_tickers:
             smart_money = ticker.get("smart_money_insights", {})
             gamma_analysis = smart_money.get("gamma_analysis", {})
@@ -619,9 +625,9 @@ class HTMLGenerator:
         put_credit_spreads = []
         neutral_tickers = []
         
-        # Process all tickers from both clusters
-        all_tickers = clusters["bullish_group"]["tickers"] + clusters["bearish_group"]["tickers"]
-        
+        # Process all tickers from all clusters
+        all_tickers = clusters["bullish_group"]["tickers"] + clusters["bearish_group"]["tickers"] + clusters.get("unclear_group", {}).get("tickers", [])
+
         for ticker in all_tickers:
             ticker_symbol = ticker["ticker"]
             smart_money = ticker.get("smart_money_insights", {})
@@ -837,7 +843,13 @@ class HTMLGenerator:
             key=lambda x: safe_int(x["confidence"]) * safe_int(x["success_probability"]),
             reverse=True
         )
-        
+
+        unclear_trades = sorted(
+            clusters.get("unclear_group", {}).get("tickers", []),
+            key=lambda x: safe_int(x["confidence"]) * safe_int(x["success_probability"]),
+            reverse=True
+        )
+
         high_conviction = []
         
         # Add bullish trades
@@ -889,9 +901,32 @@ class HTMLGenerator:
                 "smart_money_thesis": trade.get("smart_money_thesis", "Institutional positioning detected"),
                 "smart_money_insights": trade.get("smart_money_insights", {})
             })
-        
 
-        
+        # Add unclear trades
+        for trade in unclear_trades:
+            high_conviction.append({
+                "ticker": trade["ticker"],
+                "pattern_type": trade["pattern_type"].replace("_", " ").title(),
+                "direction": "unclear",
+                "confidence": f"{safe_int(trade['confidence'])}%",
+                "entry": f"${safe_float(trade['entry'])}" if str(trade['entry']).replace('.','').replace('-','').isdigit() or '.' in str(trade['entry']) else trade["entry"],
+                "target": f"${safe_float(trade['target'])}" if str(trade['target']).replace('.','').replace('-','').isdigit() or '.' in str(trade['target']) else trade["target"],
+                "stop_loss": f"${safe_float(trade['stop_loss'])}" if str(trade['stop_loss']).replace('.','').replace('-','').isdigit() or '.' in str(trade['stop_loss']) else trade["stop_loss"],
+                "risk_reward": trade["risk_reward"],
+                "expiry": trade["expiry"],
+                "dte": trade["dte"],
+                "success_prob": f"{safe_int(trade['success_probability'])}%",
+                "current_price": trade["current_price"],
+                "supporting_evidence": trade["supporting_evidence"][:4],
+                "timeframe_confluence": trade.get("timeframe_confluence", "Multi-timeframe aligned"),
+                "entry_triggers": trade.get("entry_triggers", ["Price confirmation", "Volume spike"]),
+                "technical_levels": trade.get("technical_levels", {}),
+                "volatility_regime": trade.get("volatility_regime", "Medium volatility"),
+                "institutional_flow": trade.get("institutional_flow", "Smart money positioning"),
+                "smart_money_thesis": trade.get("smart_money_thesis", "Institutional positioning detected"),
+                "smart_money_insights": trade.get("smart_money_insights", {})
+            })
+
         return high_conviction  # Return ALL trades, not limited
 
     def _get_consolidated_high_conviction_trades(self, clusters, max_count=None):
@@ -899,7 +934,7 @@ class HTMLGenerator:
 
         # Collect all trades across timeframes
         all_trades = []
-        for group in ["bullish_group", "bearish_group"]:
+        for group in ["bullish_group", "bearish_group", "unclear_group"]:
             if group in clusters:
                 all_trades.extend(clusters[group]["tickers"])
 
@@ -1072,7 +1107,20 @@ class HTMLGenerator:
                 "success_prob": f"{safe_int(trade['success_probability'])}%",
                 "risk_reward": trade["risk_reward"]
             })
-        
+
+        # Add unclear recommendations
+        for trade in clusters.get("unclear_group", {}).get("tickers", []):
+            recommendations.append({
+                "ticker": trade["ticker"],
+                "pattern": trade["pattern_type"].replace("_", " ").title(),
+                "direction": "UNCLEAR",
+                "entry": trade["entry"],
+                "target": trade["target"],
+                "expiry": f"{trade['expiry']} ({trade['dte']} DTE)",
+                "success_prob": f"{safe_int(trade['success_probability'])}%",
+                "risk_reward": trade["risk_reward"]
+            })
+
         # Sort by success probability using safe_int
         recommendations.sort(key=lambda x: safe_int(x["success_prob"]), reverse=True)
         
@@ -1090,7 +1138,11 @@ class HTMLGenerator:
         for ticker in clusters["bearish_group"]["tickers"]:
             total_weighted += safe_int(ticker["success_probability"])
             total_count += 1
-        
+
+        for ticker in clusters.get("unclear_group", {}).get("tickers", []):
+            total_weighted += safe_int(ticker["success_probability"])
+            total_count += 1
+
         if total_count == 0:
             return "0.0%"
         

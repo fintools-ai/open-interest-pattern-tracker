@@ -18,7 +18,7 @@ class ClusteringEngine:
         self.confidence_threshold = CONFIDENCE_THRESHOLD
     
     def cluster_analyses(self, all_analyses):
-        """Group all ticker analyses into bullish/bearish clusters with multi-timeframe support"""
+        """Group all ticker analyses into bullish/bearish/unclear clusters with multi-timeframe support"""
         clusters = {
             "bullish_group": {
                 "tickers": [],
@@ -28,6 +28,13 @@ class ClusteringEngine:
                 "total_count": 0
             },
             "bearish_group": {
+                "tickers": [],
+                "avg_confidence": 0,
+                "avg_success_probability": 0,
+                "pattern_types": {},
+                "total_count": 0
+            },
+            "unclear_group": {
                 "tickers": [],
                 "avg_confidence": 0,
                 "avg_success_probability": 0,
@@ -47,18 +54,18 @@ class ClusteringEngine:
         # Process timeframe confluence
         clusters["multi_timeframe"] = self._analyze_timeframe_confluence(ticker_groups)
 
-        # Process each analysis for traditional bullish/bearish clustering
+        # Process each analysis for bullish/bearish/unclear clustering
+        # SHOW ALL TICKERS - including errors and unclear signals
         for analysis in all_analyses:
-            if analysis.get("status") == "error":
-                continue
-
             classification = self._classify_analysis(analysis)
 
             if classification == "bullish":
                 self._add_to_bullish(clusters, analysis)
             elif classification == "bearish":
                 self._add_to_bearish(clusters, analysis)
-            # No neutral handling - all trades must be bullish or bearish
+            else:
+                # Unclear direction, errors, or any other case
+                self._add_to_unclear(clusters, analysis)
 
         # Calculate group statistics
         self._calculate_group_stats(clusters)
@@ -114,15 +121,29 @@ class ClusteringEngine:
         """Add analysis to bearish cluster"""
         ticker_info = self._extract_ticker_info(analysis, "bearish")
         clusters["bearish_group"]["tickers"].append(ticker_info)
-        
+
         # Track pattern types
         pattern_type = analysis.get("pattern_analysis", {}).get("pattern_type", "unknown")
         if pattern_type not in clusters["bearish_group"]["pattern_types"]:
             clusters["bearish_group"]["pattern_types"][pattern_type] = 0
         clusters["bearish_group"]["pattern_types"][pattern_type] += 1
-    
 
-    
+    def _add_to_unclear(self, clusters, analysis):
+        """Add analysis to unclear/neutral cluster"""
+        ticker_info = self._extract_ticker_info(analysis, "unclear")
+        clusters["unclear_group"]["tickers"].append(ticker_info)
+
+        # Track pattern types (or error types)
+        if analysis.get("status") == "error":
+            pattern_type = f"error: {analysis.get('error', 'unknown')[:50]}"
+        else:
+            pattern_type = analysis.get("pattern_analysis", {}).get("pattern_type", "unclear_signal")
+
+        if pattern_type not in clusters["unclear_group"]["pattern_types"]:
+            clusters["unclear_group"]["pattern_types"][pattern_type] = 0
+        clusters["unclear_group"]["pattern_types"][pattern_type] += 1
+
+
     def _extract_ticker_info(self, analysis, cluster_type):
         """Extract key information for ticker clustering"""
         trade_rec = analysis.get("trade_recommendation", {})
@@ -173,47 +194,62 @@ class ClusteringEngine:
             total_confidence = sum(safe_int(t["confidence"]) for t in bullish_tickers)
             total_success_prob = sum(safe_int(t["success_probability"]) for t in bullish_tickers)
             count = len(bullish_tickers)
-            
+
             clusters["bullish_group"]["avg_confidence"] = total_confidence / count
             clusters["bullish_group"]["avg_success_probability"] = total_success_prob / count
             clusters["bullish_group"]["total_count"] = count
-        
+
         # Bearish group stats
         bearish_tickers = clusters["bearish_group"]["tickers"]
         if bearish_tickers:
             total_confidence = sum(safe_int(t["confidence"]) for t in bearish_tickers)
             total_success_prob = sum(safe_int(t["success_probability"]) for t in bearish_tickers)
             count = len(bearish_tickers)
-            
+
             clusters["bearish_group"]["avg_confidence"] = total_confidence / count
             clusters["bearish_group"]["avg_success_probability"] = total_success_prob / count
             clusters["bearish_group"]["total_count"] = count
-        
+
+        # Unclear group stats
+        unclear_tickers = clusters["unclear_group"]["tickers"]
+        if unclear_tickers:
+            total_confidence = sum(safe_int(t["confidence"]) for t in unclear_tickers)
+            total_success_prob = sum(safe_int(t["success_probability"]) for t in unclear_tickers)
+            count = len(unclear_tickers)
+
+            clusters["unclear_group"]["avg_confidence"] = total_confidence / count if count > 0 else 0
+            clusters["unclear_group"]["avg_success_probability"] = total_success_prob / count if count > 0 else 0
+            clusters["unclear_group"]["total_count"] = count
+
 
     
     def _generate_cluster_summary(self, clusters):
         """Generate human-readable cluster summary"""
         bullish_count = clusters["bullish_group"]["total_count"]
         bearish_count = clusters["bearish_group"]["total_count"]
+        unclear_count = clusters["unclear_group"]["total_count"]
         total = clusters["total_analyzed"]
-        
+
         summary = {
             "distribution": {
                 "bullish_signals": bullish_count,
                 "bearish_signals": bearish_count,
+                "unclear_signals": unclear_count,
                 "total_processed": total
             },
             "success_rates": {
                 "bullish_avg_probability": clusters["bullish_group"]["avg_success_probability"],
-                "bearish_avg_probability": clusters["bearish_group"]["avg_success_probability"]
+                "bearish_avg_probability": clusters["bearish_group"]["avg_success_probability"],
+                "unclear_avg_probability": clusters["unclear_group"]["avg_success_probability"]
             },
             "dominant_patterns": {
                 "bullish": self._get_dominant_pattern(clusters["bullish_group"]["pattern_types"]),
-                "bearish": self._get_dominant_pattern(clusters["bearish_group"]["pattern_types"])
+                "bearish": self._get_dominant_pattern(clusters["bearish_group"]["pattern_types"]),
+                "unclear": self._get_dominant_pattern(clusters["unclear_group"]["pattern_types"])
             },
             "market_bias": self._determine_market_bias(bullish_count, bearish_count)
         }
-        
+
         return summary
     
     def _get_dominant_pattern(self, pattern_types):
