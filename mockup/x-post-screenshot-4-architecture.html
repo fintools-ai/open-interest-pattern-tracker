@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OI Pattern Tracker - Architecture</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #fff;
+            padding: 30px;
+            min-height: 100vh;
+        }
+        
+        .arch-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .arch-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .arch-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #00ff88;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+        
+        .arch-subtitle {
+            color: #888;
+            font-size: 16px;
+        }
+        
+        .flow-diagram {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .flow-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+        
+        .flow-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .component {
+            background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+            border: 2px solid #333;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            min-width: 180px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .component:hover {
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+        
+        .component-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        .component-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #00ff88;
+            margin-bottom: 8px;
+        }
+        
+        .component-desc {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.4;
+        }
+        
+        .component-tech {
+            background: #222;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            color: #666;
+            margin-top: 8px;
+            display: inline-block;
+        }
+        
+        .flow-arrow {
+            color: #00ff88;
+            font-size: 24px;
+            position: relative;
+        }
+        
+        .flow-arrow-down {
+            position: absolute;
+            left: 50%;
+            bottom: -20px;
+            transform: translateX(-50%);
+            color: #00ff88;
+            font-size: 24px;
+        }
+        
+        .data-sources {
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+        }
+        
+        .mcp-layer {
+            background: linear-gradient(135deg, #7209b7, #a663cc);
+        }
+        
+        .ai-layer {
+            background: linear-gradient(135deg, #ff6b6b, #feca57);
+        }
+        
+        .ui-layer {
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+        }
+        
+        .storage-layer {
+            background: linear-gradient(135deg, #ff4757, #ff3838);
+        }
+        
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .tech-category {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .tech-category h3 {
+            color: #00ff88;
+            font-size: 18px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .tech-list {
+            list-style: none;
+        }
+        
+        .tech-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #222;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .tech-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .tech-name {
+            color: #fff;
+            font-weight: 600;
+        }
+        
+        .tech-purpose {
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .performance-stats {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        
+        .perf-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .perf-item {
+            text-align: center;
+            padding: 15px;
+            background: #1a1a1a;
+            border-radius: 8px;
+        }
+        
+        .perf-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #00ff88;
+            margin-bottom: 5px;
+        }
+        
+        .perf-label {
+            color: #888;
+            font-size: 12px;
+        }
+        
+        .workflow-steps {
+            background: #111;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        
+        .workflow-step {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            border-left: 4px solid #00ff88;
+        }
+        
+        .step-number {
+            background: #00ff88;
+            color: #000;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        
+        .step-content {
+            flex: 1;
+        }
+        
+        .step-title {
+            color: #fff;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .step-desc {
+            color: #888;
+            font-size: 12px;
+        }
+        
+        .connection-line {
+            position: absolute;
+            background: linear-gradient(90deg, #00ff88, transparent);
+            height: 2px;
+            width: calc(100% - 360px);
+            left: 180px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: -1;
+        }
+        
+        .vertical-line {
+            position: absolute;
+            background: linear-gradient(180deg, #00ff88, transparent);
+            width: 2px;
+            height: 20px;
+            left: 50%;
+            bottom: -30px;
+            transform: translateX(-50%);
+            z-index: -1;
+        }
+    </style>
+</head>
+<body>
+    <div class="arch-container">
+        <div class="arch-header">
+            <div class="arch-title">🏗️ OI Pattern Tracker Architecture</div>
+            <div class="arch-subtitle">Real-time options flow analysis powered by modern AI infrastructure</div>
+        </div>
+        
+        <div class="flow-diagram">
+            <!-- Data Sources Row -->
+            <div class="flow-row">
+                <div class="component data-sources">
+                    <span class="component-icon">📊</span>
+                    <div class="component-title">Market Data</div>
+                    <div class="component-desc">Real-time options chains, OI data, volume, Greeks</div>
+                    <div class="component-tech">Live Feeds</div>
+                </div>
+                
+                <div class="flow-arrow">→</div>
+                
+                <div class="component mcp-layer">
+                    <span class="component-icon">🔧</span>
+                    <div class="component-title">MCP Services</div>
+                    <div class="component-desc">Model Context Protocol servers for data processing</div>
+                    <div class="component-tech">Python MCP</div>
+                </div>
+                
+                <div class="flow-arrow">→</div>
+                
+                <div class="component ai-layer">
+                    <span class="component-icon">🤖</span>
+                    <div class="component-title">AWS Bedrock</div>
+                    <div class="component-desc">Claude Sonnet 4 with Converse API</div>
+                    <div class="component-tech">Claude AI</div>
+                </div>
+            </div>
+            
+            <div class="vertical-line"></div>
+            
+            <!-- Processing Layer Row -->
+            <div class="flow-row">
+                <div class="component storage-layer">
+                    <span class="component-icon">💾</span>
+                    <div class="component-title">Redis Cache</div>
+                    <div class="component-desc">Session management, analysis results, conversation history</div>
+                    <div class="component-tech">Redis</div>
+                </div>
+                
+                <div class="flow-arrow">↔</div>
+                
+                <div class="component ui-layer">
+                    <span class="component-icon">🖥️</span>
+                    <div class="component-title">Flask Web Service</div>
+                    <div class="component-desc">REST API, WebSocket connections, session handling</div>
+                    <div class="component-tech">Python Flask</div>
+                </div>
+                
+                <div class="flow-arrow">→</div>
+                
+                <div class="component ui-layer">
+                    <span class="component-icon">📱</span>
+                    <div class="component-title">Interactive UI</div>
+                    <div class="component-desc">Real-time dashboard, chat interface, mobile responsive</div>
+                    <div class="component-tech">HTML5/JS</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="workflow-steps">
+            <h3 style="color: #00ff88; margin-bottom: 20px;">🔄 Real-Time Workflow</h3>
+            
+            <div class="workflow-step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Data Ingestion</div>
+                    <div class="step-desc">MCP services continuously fetch live OI data, market data, and options chains</div>
+                </div>
+            </div>
+            
+            <div class="workflow-step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Pattern Detection</div>
+                    <div class="step-desc">AI analyzes smart money flow, unusual activity, and gamma positioning</div>
+                </div>
+            </div>
+            
+            <div class="workflow-step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">Interactive Analysis</div>
+                    <div class="step-desc">User clicks trade card → AI session starts → Claude uses tools to get fresh data</div>
+                </div>
+            </div>
+            
+            <div class="workflow-step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <div class="step-title">Real-Time Response</div>
+                    <div class="step-desc">Parallel tool execution, markdown rendering, session persistence</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tech-stack">
+            <div class="tech-category">
+                <h3>🤖 AI & ML</h3>
+                <ul class="tech-list">
+                    <li>
+                        <span class="tech-name">AWS Bedrock</span>
+                        <span class="tech-purpose">AI Infrastructure</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">Claude Sonnet 4</span>
+                        <span class="tech-purpose">LLM Processing</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">Converse API</span>
+                        <span class="tech-purpose">Tool Calling</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">Parallel Execution</span>
+                        <span class="tech-purpose">Performance</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="tech-category">
+                <h3>🔧 Backend</h3>
+                <ul class="tech-list">
+                    <li>
+                        <span class="tech-name">Python Flask</span>
+                        <span class="tech-purpose">Web Framework</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">MCP Protocol</span>
+                        <span class="tech-purpose">Data Services</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">Redis</span>
+                        <span class="tech-purpose">Caching & Sessions</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">Asyncio</span>
+                        <span class="tech-purpose">Async Processing</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="tech-category">
+                <h3>📊 Data Layer</h3>
+                <ul class="tech-list">
+                    <li>
+                        <span class="tech-name">Live OI Data</span>
+                        <span class="tech-purpose">Options Chains</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">Market Data API</span>
+                        <span class="tech-purpose">Real-time Pricing</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">JSON-RPC</span>
+                        <span class="tech-purpose">MCP Communication</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">WebSocket</span>
+                        <span class="tech-purpose">Live Updates</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="tech-category">
+                <h3>🎨 Frontend</h3>
+                <ul class="tech-list">
+                    <li>
+                        <span class="tech-name">HTML5/CSS3</span>
+                        <span class="tech-purpose">UI Framework</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">Vanilla JS</span>
+                        <span class="tech-purpose">Interactions</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">Marked.js</span>
+                        <span class="tech-purpose">Markdown Rendering</span>
+                    </li>
+                    <li>
+                        <span class="tech-name">Responsive Design</span>
+                        <span class="tech-purpose">Mobile Support</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="performance-stats">
+            <h3 style="color: #00ff88; margin-bottom: 20px; text-align: center;">⚡ Performance Metrics</h3>
+            <div class="perf-grid">
+                <div class="perf-item">
+                    <div class="perf-value">&lt;1.5s</div>
+                    <div class="perf-label">OI Data Fetch</div>
+                </div>
+                <div class="perf-item">
+                    <div class="perf-value">&lt;1s</div>
+                    <div class="perf-label">Market Data</div>
+                </div>
+                <div class="perf-item">
+                    <div class="perf-value">2-4s</div>
+                    <div class="perf-label">AI Response</div>
+                </div>
+                <div class="perf-item">
+                    <div class="perf-value">10x</div>
+                    <div class="perf-label">Parallel Speedup</div>
+                </div>
+                <div class="perf-item">
+                    <div class="perf-value">85%+</div>
+                    <div class="perf-label">Pattern Accuracy</div>
+                </div>
+                <div class="perf-item">
+                    <div class="perf-value">24/7</div>
+                    <div class="perf-label">Uptime</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

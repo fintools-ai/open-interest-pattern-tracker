@@ -110,7 +110,6 @@ from data_pipeline.collector import EnhancedOIDataCollector
 from data_pipeline.redis_manager import RedisManager
 from data_pipeline.delta_calculator import DeltaCalculator
 from data_pipeline.market_context import MarketContextProvider
-from analysis.llm_analyzer import LLMAnalyzer
 from analysis.clustering_engine import ClusteringEngine
 from output.html_generator import HTMLGenerator
 import json
@@ -122,11 +121,10 @@ class OIPatternTracker:
         self.redis_manager = RedisManager()
         self.delta_calculator = DeltaCalculator()
         self.market_context_provider = MarketContextProvider()
-        self.llm_analyzer = LLMAnalyzer()
         self.clustering_engine = ClusteringEngine()
         self.html_generator = HTMLGenerator()
-        
-        print("OI Pattern Tracker initialized")
+
+        print("OI Pattern Tracker initialized with Strands Graph architecture")
     
     async def run_daily_analysis(self):
         """Execute complete daily analysis workflow"""
@@ -228,56 +226,30 @@ class OIPatternTracker:
 
             print(f"Calculated deltas and stored data for {total_analyses} ticker/timeframe combinations ({len(ticker_data)} tickers x {len(self.collector.analysis_days)} timeframes)")
             
-            # Phase 4: Multi-Timeframe LLM Analysis
-            print("\nPhase 4: Multi-Timeframe LLM Analysis with Price Context")
-            analyses = []
+            # Phase 4: Parallel 3-Agent Graph Analysis
+            print("\nPhase 4: Parallel 3-Agent Graph Analysis (OI + Market Data -> Result Gen)")
+            print("Using Strands Graph: OI Agent || Market Data Agent -> Result Generator")
 
-            # Process all ticker/timeframe combinations
-            for ticker_result in processed_tickers:
-                ticker = ticker_result["ticker"]
-                dte_period = ticker_result["dte_period"]
-                print(f"  Analyzing {ticker} ({dte_period} DTE)...")
+            from analysis.trading_graph import ParallelTickerAnalyzer
 
-                # Only analyze if we have OI data
-                if ticker_result.get("oi_data"):
-                    print(f"    OI data keys: {list(ticker_result['oi_data'].keys())}")
-                    analysis = self.llm_analyzer.analyze_ticker(
-                        ticker_result["oi_data"],
-                        ticker_result["delta"],
-                        market_context,
-                        ticker_result.get("market_data"),  # Pass market data with prices
-                        dte_period  # Pass the DTE period for timeframe-specific analysis
-                    )
+            # Initialize parallel analyzer with 10 workers
+            analyzer = ParallelTickerAnalyzer(max_workers=10)
 
-                    # Add timeframe metadata to analysis result
-                    analysis["dte_period"] = dte_period
-                    analysis["timeframe_id"] = f"{ticker}_{dte_period}DTE"
-                    analysis["delta_data"] = ticker_result["delta"]
+            # Run parallel analysis on all ticker/timeframe combinations
+            analyses = await analyzer.analyze_all_tickers(processed_tickers, market_context)
 
-                    print(f"    Analysis result: {analysis.get('status', 'unknown')}")
-
-                    # Log if we have price enhancement
-                    if ticker_result.get("market_data") and ticker_result["market_data"].get("current_price"):
-                        print(f"    Enhanced with price: ${ticker_result['market_data']['current_price']}")
-                else:
-                    analysis = {
-                        "ticker": ticker,
-                        "dte_period": dte_period,
-                        "timeframe_id": f"{ticker}_{dte_period}DTE",
-                        "status": "error",
-                        "error": "No OI data available"
-                    }
-
-                analyses.append(analysis)
-                print(f"    Analysis status: {analysis.get('status', 'unknown')}")
-                if analysis.get('status') == 'error':
-                    print(f"    Error: {analysis.get('error', 'unknown')}")
-
-                # Store analysis result with DTE-specific key
+            # Store analysis results in Redis
+            for analysis in analyses:
+                ticker = analysis.get("ticker", "UNKNOWN")
+                dte_period = analysis.get("dte_period", 30)
                 analysis_key = f"{ticker}:{dte_period}DTE"
                 self.redis_manager.store_analysis_result(analysis_key, today, analysis)
 
-            print(f"Completed LLM analysis for {len(analyses)} ticker/timeframe combinations")
+                # Add timeframe metadata for compatibility with clustering
+                if "timeframe_id" not in analysis:
+                    analysis["timeframe_id"] = f"{ticker}_{dte_period}DTE"
+
+            print(f"Completed parallel 3-agent analysis for {len(analyses)} ticker/timeframe combinations")
             
             print("--------")
             print(json.dumps(analyses, indent=2))

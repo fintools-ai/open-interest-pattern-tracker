@@ -1,0 +1,635 @@
+{
+  "bullish_group": {
+    "tickers": [
+      {
+        "ticker": "SPY",
+        "confidence": "30% - severely limited by lack of OI intelligence",
+        "success_probability": "35% - low confidence due to missing OI data",
+        "pattern_type": "other",
+        "pattern_strength": "weak",
+        "entry": "ATM Call options based on technical bullish bias from daily timeframe",
+        "target": "4.00",
+        "stop_loss": "1.25",
+        "risk_reward": "1:1.2",
+        "expiry": "2025-09-10",
+        "dte": 30,
+        "position_size": "1% - conservative due to data limitations",
+        "current_price": 636.0,
+        "supporting_evidence": [
+          "Daily timeframe shows 66.7% uptrend continuation probability",
+          "Positive OBV and CMF across all timeframes indicating accumulation",
+          "Bullish divergence present on daily and 1-minute charts",
+          "Strong ADX readings suggest trending conditions"
+        ],
+        "timeframe_confluence": "Daily bullish conflicts with 5m/15m bearish - mixed signals",
+        "volatility_regime": "Unknown - VIX and IV data unavailable",
+        "entry_triggers": [
+          "Price reclaim above 637.00 resistance",
+          "RSI bullish cross above 45 on 15-minute timeframe"
+        ],
+        "institutional_flow": "Unknown - no open interest or dark pool flow data available",
+        "smart_money_thesis": "Cannot determine institutional positioning without OI intelligence - forced to rely on volume patterns showing recent bullish accumulation",
+        "technical_levels": {
+          "support": "629.00",
+          "resistance": "637.00",
+          "pivot": "633.00"
+        },
+        "momentum_indicators": "Daily RSI at 60.8 shows room to run, but 5m RSI at 40.3 oversold, 1m RSI neutral at 55.2",
+        "volume_analysis": "Consistent positive OBV and CMF across timeframes suggests institutional accumulation despite price weakness",
+        "multi_timeframe_summary": "Daily shows strong bullish continuation factors but short-term timeframes display bearish momentum creating conflict"
+      },
+      {
+        "ticker": "AMD",
+        "confidence": "60% - Limited by lack of OI data",
+        "success_probability": "65%",
+        "pattern_type": "institutional_accumulation",
+        "pattern_strength": "moderate",
+        "entry": "Long AMD calls on pullback to 170-172 support zone",
+        "target": "5.00",
+        "stop_loss": "1.25",
+        "risk_reward": "1:2.0",
+        "expiry": "2025-09-12",
+        "dte": 30,
+        "position_size": "3%",
+        "current_price": "172.50",
+        "supporting_evidence": [
+          "Daily OBV positive at 1.01B indicating accumulation",
+          "Daily CMF positive at 0.1229 showing money flow into stock",
+          "Strong daily uptrend with ADX 37.97",
+          "Price 18.88% above 50-day SMA"
+        ],
+        "timeframe_confluence": "Daily bullish, intraday bearish - waiting for alignment",
+        "volatility_regime": "High volatility environment based on ATR readings",
+        "entry_triggers": [
+          "Price bounces from 170-172 support with volume confirmation",
+          "RSI on 1m/5m timeframes recovers above 40",
+          "MACD histogram turns positive on 5m chart"
+        ],
+        "institutional_flow": "Unable to determine without OI data - relying on volume indicators showing net accumulation",
+        "smart_money_thesis": "Cannot establish without OI intelligence - major analytical handicap",
+        "technical_levels": {
+          "support": "170.15",
+          "resistance": "175.00",
+          "pivot": "172.50"
+        },
+        "momentum_indicators": "Daily RSI 61.4 healthy, intraday RSI oversold creating opportunity",
+        "volume_analysis": "Daily OBV bullish accumulation pattern, intraday selling pressure temporary",
+        "multi_timeframe_summary": "Daily strong uptrend conflicts with intraday weakness - classic pullback setup"
+      },
+      {
+        "ticker": "QQQ",
+        "confidence": "25% - Limited by lack of OI intelligence",
+        "success_probability": "45% - Technical setup despite limited OI visibility",
+        "pattern_type": "other",
+        "pattern_strength": "weak",
+        "entry": "Long QQQ 575 Call targeting bounce from oversold intraday conditions",
+        "target": "4.00",
+        "stop_loss": "1.50",
+        "risk_reward": "1:1.5",
+        "expiry": "2025-09-10",
+        "dte": 30,
+        "position_size": "2% - Conservative sizing due to data limitations",
+        "current_price": 572.47,
+        "supporting_evidence": [
+          "Daily uptrend structure intact with price above 50-day SMA",
+          "Oversold conditions on shorter timeframes suggesting bounce potential",
+          "Bullish volume patterns on 1-minute timeframe",
+          "Ichimoku cloud bullish on daily timeframe"
+        ],
+        "timeframe_confluence": "Mixed alignment - Daily bullish, 5m oversold bounce setup, 1m neutral with volume support",
+        "volatility_regime": "Medium volatility environment based on ATR readings across timeframes",
+        "entry_triggers": [
+          "RSI divergence forming on 5-minute timeframe",
+          "Break above 574 resistance with volume confirmation",
+          "VWAP reclaim on intraday timeframes"
+        ],
+        "institutional_flow": "Unable to determine smart money positioning due to missing OI data - relying on volume patterns which show mixed institutional activity",
+        "smart_money_thesis": "Cannot establish clear institutional thesis without OI data - volume analysis suggests cautious institutional participation",
+        "technical_levels": {
+          "support": "563.35",
+          "resistance": "574.49",
+          "pivot": "572.47"
+        },
+        "momentum_indicators": "RSI oversold on 5m (35), daily RSI neutral (63), MACD showing negative momentum short-term but positive daily",
+        "volume_analysis": "OBV positive across timeframes, CMF mixed suggesting institutional indecision, up-volume ratio favoring bulls on 1m",
+        "multi_timeframe_summary": "Daily maintains bullish bias above 563 EMA20, intraday timeframes oversold with RSI 35 on 5m creating potential bounce setup"
+      },
+      {
+        "ticker": "VIX",
+        "confidence": "15% - based solely on historical VIX mean reversion tendencies",
+        "success_probability": "35% - historical VIX mean reversion only",
+        "pattern_type": "other",
+        "pattern_strength": "weak",
+        "entry": "VIX 20 strike calls as volatility mean reversion play",
+        "target": "25.00",
+        "stop_loss": "Below 15.00 VIX level",
+        "risk_reward": "1:1.5",
+        "expiry": "2025-09-10",
+        "dte": 30,
+        "position_size": "1% - extremely small due to data uncertainty",
+        "current_price": "Unable to extract - no price data available",
+        "supporting_evidence": [
+          "Zero open interest suggests potential market bottom in volatility",
+          "Absence of hedging activity may indicate complacency"
+        ],
+        "timeframe_confluence": "No timeframe data available for confluence analysis",
+        "volatility_regime": "Unknown - critical data unavailable",
+        "entry_triggers": [
+          "Wait for data feed restoration",
+          "Confirm VIX below 18 on entry"
+        ],
+        "institutional_flow": "No institutional positioning detectable - either extremely quiet market or data feed failure",
+        "smart_money_thesis": "Institutions appear absent from VIX options market or using alternative hedging vehicles",
+        "technical_levels": {
+          "support": "Historical 12.00",
+          "resistance": "Historical 30.00",
+          "pivot": "Historical 18.00"
+        },
+        "momentum_indicators": "All indicators failed - RSI, MACD, Stochastic unavailable",
+        "volume_analysis": "No volume or OBV data available for institutional flow analysis",
+        "multi_timeframe_summary": "All timeframes showing critical data errors - no trend analysis possible"
+      },
+      {
+        "ticker": "AAPL",
+        "confidence": "25% - Severely limited by absence of primary OI data",
+        "success_probability": "35% - Low due to conflicting signals and data gaps",
+        "pattern_type": "other",
+        "pattern_strength": "weak",
+        "entry": "Long CALL based solely on daily uptrend momentum - High risk due to lack of OI confirmation",
+        "target": "5.00",
+        "stop_loss": "1.25",
+        "risk_reward": "1:2.0",
+        "expiry": "2025-09-10",
+        "dte": 30,
+        "position_size": "1% - Minimal position due to high uncertainty",
+        "current_price": "227.11",
+        "supporting_evidence": [
+          "Daily strong uptrend with ADX 26.21 showing trending conditions",
+          "Bullish volume pattern with 51.4% up volume ratio on daily",
+          "Price above key moving averages on daily timeframe"
+        ],
+        "timeframe_confluence": "Poor - Daily bullish conflicts with intraday weakness and consolidation",
+        "volatility_regime": "Unknown - No VIX or IV data available",
+        "entry_triggers": [
+          "Break above 228.00 with volume confirmation",
+          "RSI pullback below 65 for better entry"
+        ],
+        "institutional_flow": "Cannot determine - No OI data available for smart money analysis",
+        "smart_money_thesis": "Insufficient data - Unable to decode institutional positioning without OI flow",
+        "technical_levels": {
+          "support": "213.20",
+          "resistance": "230.00",
+          "pivot": "227.11"
+        },
+        "momentum_indicators": "Daily RSI overbought at 69.81, intraday RSI neutral at 52.47 - Divergence concern",
+        "volume_analysis": "Daily OBV positive at 455M, bullish volume pattern supports uptrend",
+        "multi_timeframe_summary": "Daily strong uptrend conflicts with intraday consolidation - Mixed signals"
+      },
+      {
+        "ticker": "MSFT",
+        "confidence": "25%",
+        "success_probability": "45%",
+        "pattern_type": "other",
+        "pattern_strength": "weak",
+        "entry": "Long CALL 530 strike targeting continuation of daily uptrend",
+        "target": "7.00",
+        "stop_loss": "1.75",
+        "risk_reward": "1:2.0",
+        "expiry": "2025-09-11",
+        "dte": 30,
+        "position_size": "2%",
+        "current_price": "523",
+        "supporting_evidence": [
+          "Daily strong uptrend with ADX 46.4 suggests continued institutional support",
+          "Price trading above all major moving averages on daily timeframe",
+          "Bullish Ichimoku cloud status on daily indicating trend strength"
+        ],
+        "timeframe_confluence": "Daily bullish trend overrides intraday weakness - 1d ADX 46.4 vs mixed shorter timeframes",
+        "volatility_regime": "Medium volatility environment based on ATR readings",
+        "entry_triggers": [
+          "Break above 525 resistance with volume confirmation",
+          "RSI holding above 55 on 5-minute timeframe"
+        ],
+        "institutional_flow": "Unable to determine without OI data - technical suggests mixed positioning",
+        "smart_money_thesis": "Cannot determine institutional positioning without open interest data",
+        "technical_levels": {
+          "support": "516.14",
+          "resistance": "532.44",
+          "pivot": "524.78"
+        },
+        "momentum_indicators": "Daily RSI 59.4 in healthy uptrend zone, MACD positive at 8.49",
+        "volume_analysis": "Daily OBV positive at 334M but recent selling pressure in CMF -0.22",
+        "multi_timeframe_summary": "Daily strong uptrend conflicts with intraday consolidation - higher timeframe takes precedence"
+      },
+      {
+        "ticker": "GOOGL",
+        "confidence": "30% - severely limited by lack of OI intelligence",
+        "success_probability": "40% - low confidence due to data limitations",
+        "pattern_type": "other",
+        "pattern_strength": "weak",
+        "entry": "Long GOOGL 30DTE ATM Call on pullback to 195-197 support zone",
+        "target": "210.00",
+        "stop_loss": "190.00",
+        "risk_reward": "1:1.4",
+        "expiry": "2025-09-10",
+        "dte": 30,
+        "position_size": "2% maximum given uncertainty",
+        "current_price": "201.03",
+        "supporting_evidence": [
+          "Daily uptrend momentum remains intact with strong ADX",
+          "Price holding above key moving averages",
+          "Positive OBV suggesting accumulation on longer timeframe"
+        ],
+        "timeframe_confluence": "Daily bullish, 5min neutral, 1min mixed - weak alignment",
+        "volatility_regime": "Unknown - no VIX or implied volatility data provided",
+        "entry_triggers": [
+          "Pullback to 195-197 support zone for better risk/reward",
+          "RSI cooling from overbought levels below 65",
+          "Volume confirmation on any bounce attempt"
+        ],
+        "institutional_flow": "Unable to assess - no open interest or unusual options activity data available",
+        "smart_money_thesis": "Cannot determine without OI data - flying blind on institutional positioning",
+        "technical_levels": {
+          "support": "195.00",
+          "resistance": "205.00",
+          "pivot": "201.03"
+        },
+        "momentum_indicators": "RSI overbought daily (70.76), MACD positive but showing divergence, Stoch in overbought territory",
+        "volume_analysis": "OBV positive suggesting accumulation but recent volume declining - concerning for continuation",
+        "multi_timeframe_summary": "Daily strong uptrend but overbought, shorter timeframes showing consolidation and mixed momentum"
+      },
+      {
+        "ticker": "AMZN",
+        "confidence": "45% - Severely limited by missing OI intelligence data",
+        "success_probability": "55% - Based on technical divergence and short-term momentum",
+        "pattern_type": "other",
+        "pattern_strength": "weak",
+        "entry": "Long AMZN 225 Call expiring 30 DTE - betting on bullish divergence resolution and short-term momentum continuation",
+        "target": "4.00",
+        "stop_loss": "1.50",
+        "risk_reward": "1:1.5",
+        "expiry": "2025-09-10",
+        "dte": 30,
+        "position_size": "2% - Conservative due to limited data visibility",
+        "current_price": "221.58",
+        "supporting_evidence": [
+          "Bullish divergence on daily RSI while price makes lower lows",
+          "Strong momentum on 1-minute timeframe with rising EMA and positive CMF",
+          "Volume accumulation pattern on shortest timeframe suggests institutional interest"
+        ],
+        "timeframe_confluence": "Mixed signals - 1m strongly bullish (ADX 45.92, RSI 71.57) but daily bearish trend with bullish divergence forming",
+        "volatility_regime": "Unknown volatility environment due to missing VIX data - using ATR analysis shows elevated intraday volatility",
+        "entry_triggers": [
+          "Price break above 222.50 resistance level",
+          "Continued positive volume flow on intraday timeframes"
+        ],
+        "institutional_flow": "Unable to determine institutional positioning due to missing OI data - must rely on volume patterns showing mixed signals across timeframes",
+        "smart_money_thesis": "Without OI data, cannot determine institutional positioning - volume analysis suggests potential accumulation on shorter timeframes but distribution on daily",
+        "technical_levels": {
+          "support": "219.47",
+          "resistance": "223.98",
+          "pivot": "221.58"
+        },
+        "momentum_indicators": "RSI showing bullish divergence on daily, overbought on 1m (71.57) but momentum may continue, MACD positive on shorter timeframes",
+        "volume_analysis": "OBV positive across timeframes suggesting accumulation, CMF bullish on 1m (0.1953) but bearish on daily (-0.1403)",
+        "multi_timeframe_summary": "Bullish short-term (1m uptrend, strong ADX), bearish medium-term (daily downtrend) with potential reversal signals via bullish divergence"
+      },
+      {
+        "ticker": "ORCL",
+        "confidence": "60% - Limited by absence of OI intelligence",
+        "success_probability": "60% based on technical momentum only",
+        "pattern_type": "momentum_continuation",
+        "pattern_strength": "moderate",
+        "entry": "Long ORCL Call Strike 260 expiring 30 DTE",
+        "target": "265.00",
+        "stop_loss": "248.00",
+        "risk_reward": "1:2.3",
+        "expiry": "2025-09-10",
+        "dte": 30,
+        "position_size": "2-3% of portfolio due to moderate confidence",
+        "current_price": "252.73",
+        "supporting_evidence": [
+          "Strong daily uptrend with ADX above 25",
+          "Price well above key moving averages",
+          "Positive MACD line at 8.58",
+          "Bullish Ichimoku cloud structure on daily"
+        ],
+        "timeframe_confluence": "Daily bullish, intraday mixed - enter on intraday confirmation",
+        "volatility_regime": "Medium volatility based on ATR 7.10 on daily timeframe",
+        "entry_triggers": [
+          "Break above 253.50 with volume confirmation",
+          "RSI on 5m timeframe above 50",
+          "Positive MACD crossover on 15min"
+        ],
+        "institutional_flow": "Unable to determine institutional positioning due to lack of open interest data - major analytical blind spot",
+        "smart_money_thesis": "Cannot assess institutional positioning without OI data - trading based purely on technical momentum patterns",
+        "technical_levels": {
+          "support": "248.00",
+          "resistance": "253.50",
+          "pivot": "251.00"
+        },
+        "momentum_indicators": "Daily RSI 62.58 strong but not extreme, MACD positive at 8.58, Stoch 63.12 in bullish territory",
+        "volume_analysis": "OBV positive but recent volume patterns mixed - lacking institutional conviction signals",
+        "multi_timeframe_summary": "Daily strongly bullish, intraday consolidating - waiting for breakout confirmation"
+      }
+    ],
+    "avg_confidence": 35.0,
+    "avg_success_probability": 46.111111111111114,
+    "pattern_types": {
+      "other": 7,
+      "institutional_accumulation": 1,
+      "momentum_continuation": 1
+    },
+    "total_count": 9
+  },
+  "bearish_group": {
+    "tickers": [
+      {
+        "ticker": "ACHR",
+        "confidence": "60% - limited by lack of OI intelligence",
+        "success_probability": "60% based purely on technical analysis",
+        "pattern_type": "strong_downtrend_continuation",
+        "pattern_strength": "moderate",
+        "entry": "Long Put targeting continued downside move with oversold bounce risk",
+        "target": "0.85",
+        "stop_loss": "0.25",
+        "risk_reward": "1:2.0",
+        "expiry": "2025-09-10",
+        "dte": 30,
+        "position_size": "2% given moderate confidence without OI confirmation",
+        "current_price": "9.55",
+        "supporting_evidence": [
+          "Price below all major moving averages",
+          "Bearish Ichimoku cloud formation across timeframes",
+          "Strong ADX 45.95 on 5m confirming trending environment",
+          "Negative OBV indicating distribution"
+        ],
+        "timeframe_confluence": "All timeframes bearish - 1m showing 11% upside probability, 5m showing 11% upside probability, 1d showing 22% upside probability",
+        "volatility_regime": "Medium volatility with ATR 0.648 on daily suggesting normal trading ranges",
+        "entry_triggers": [
+          "Break below 9.50 support level",
+          "RSI bounce rejection from 50 level",
+          "Volume confirmation on breakdown"
+        ],
+        "institutional_flow": "Unable to determine due to missing OI data - flying blind on smart money positioning",
+        "smart_money_thesis": "Cannot assess institutional positioning without OI data - major analytical handicap",
+        "technical_levels": {
+          "support": "9.40",
+          "resistance": "9.68",
+          "pivot": "9.55"
+        },
+        "momentum_indicators": "RSI oversold across timeframes (40.74 daily, 44.49 1m, 43.05 5m), MACD negative, Stochastic in oversold territory",
+        "volume_analysis": "Mixed signals - positive OBV on daily but negative on shorter timeframes, CMF slightly negative indicating distribution",
+        "multi_timeframe_summary": "Strong bearish alignment - 1m trend strong downtrend, 5m trend strong downtrend with high ADX, 1d trend downtrend with bearish divergence"
+      },
+      {
+        "ticker": "HOOD",
+        "confidence": "35% - severely handicapped by missing OI intelligence",
+        "success_probability": "45% - limited by data constraints",
+        "pattern_type": "distribution",
+        "pattern_strength": "weak",
+        "entry": "Long PUT at 114 strike targeting intraday momentum continuation",
+        "target": "4.00",
+        "stop_loss": "1.75",
+        "risk_reward": "1:2.0",
+        "expiry": "2025-09-10",
+        "dte": 30,
+        "position_size": "2% - conservative due to low confidence",
+        "current_price": 114.16,
+        "supporting_evidence": [
+          "Daily bullish momentum conflicting with intraday bearish pressure",
+          "RSI showing overbought on daily (67.24) with oversold intraday conditions",
+          "Volume analysis mixed - positive OBV daily but negative CMF intraday",
+          "Strong ADX on lower timeframes (61.13 on 1m) suggesting trend exhaustion"
+        ],
+        "timeframe_confluence": "Bearish on 1m/5m timeframes, bullish daily creates conflict",
+        "volatility_regime": "Unknown - no VIX or implied volatility data available",
+        "entry_triggers": [
+          "Break below 114.00 with volume confirmation",
+          "RSI remaining below 30 on 5-minute timeframe",
+          "Failure to reclaim VWAP at 115.96"
+        ],
+        "institutional_flow": "Unable to determine institutional positioning due to missing OI data - operating on technical patterns only",
+        "smart_money_thesis": "Data insufficient for institutional thesis - recommend waiting for OI data or using alternative positioning indicators",
+        "technical_levels": {
+          "support": "113.50",
+          "resistance": "116.00",
+          "pivot": "114.80"
+        },
+        "momentum_indicators": "Daily RSI overbought at 67.24, intraday oversold (RSI 28 on 1m), MACD negative across timeframes",
+        "volume_analysis": "Mixed signals - positive daily OBV (527M) suggests accumulation, negative intraday CMF (-0.08) suggests distribution",
+        "multi_timeframe_summary": "Daily bullish (trending up), intraday bearish (strong downtrend) - conflict suggests distribution phase"
+      },
+      {
+        "ticker": "TTD",
+        "confidence": "40% - severely limited by lack of OI intelligence",
+        "success_probability": "55% based purely on technical momentum",
+        "pattern_type": "other",
+        "pattern_strength": "weak",
+        "entry": "Long Put based on continuation of technical downtrend",
+        "target": "5.00",
+        "stop_loss": "1.25",
+        "risk_reward": "1:2.0",
+        "expiry": "2025-09-10",
+        "dte": 30,
+        "position_size": "2% due to high uncertainty without OI data",
+        "current_price": "53.29",
+        "supporting_evidence": [
+          "Strong downtrend confirmed by ADX above 45 on daily timeframe",
+          "Bearish divergence present on daily chart",
+          "Price trading below all major moving averages"
+        ],
+        "timeframe_confluence": "Bearish alignment on daily and 15min, neutral on 1min",
+        "volatility_regime": "High volatility environment based on ATR readings",
+        "entry_triggers": [
+          "Break below 53.00 support level",
+          "RSI failure to break above 30 on any bounce"
+        ],
+        "institutional_flow": "Unable to determine without OI data - flying blind on smart money positioning",
+        "smart_money_thesis": "Cannot assess institutional positioning without open interest data",
+        "technical_levels": {
+          "support": "50.00",
+          "resistance": "55.00",
+          "pivot": "53.00"
+        },
+        "momentum_indicators": "RSI oversold at 24 on daily, MACD negative, Stoch in oversold territory",
+        "volume_analysis": "OBV negative, CMF bearish at -0.41, strong selling pressure evident",
+        "multi_timeframe_summary": "Daily strong downtrend, 15min bearish, 1min neutral - overall bearish bias"
+      },
+      {
+        "ticker": "COIN",
+        "confidence": "35% - severely limited by lack of OI intelligence",
+        "success_probability": "60% based purely on technical trend continuation",
+        "pattern_type": "other",
+        "pattern_strength": "weak",
+        "entry": "Long PUT at 30 DTE targeting continuation of daily downtrend",
+        "target": "290-300 zone based on trend projection",
+        "stop_loss": "Close above 350 (daily resistance)",
+        "risk_reward": "1:1.8",
+        "expiry": "2025-09-11",
+        "dte": 30,
+        "position_size": "2-3% of portfolio due to high volatility and limited conviction",
+        "current_price": "320.47",
+        "supporting_evidence": [
+          "Daily downtrend with ADX 37.61 showing strong directional movement",
+          "Price below EMA20 (343.89) and SMA50 (331.19) on daily",
+          "RSI oversold conditions across timeframes"
+        ],
+        "timeframe_confluence": "Daily bearish, 15m mixed with bullish divergence, 1m bearish - moderate confluence",
+        "volatility_regime": "High volatility environment based on ATR readings",
+        "entry_triggers": [
+          "Bounce to 330-335 resistance zone for better entry",
+          "RSI relief rally to 45-50 level on daily"
+        ],
+        "institutional_flow": "Unable to determine without open interest data - operating blind on smart money positioning",
+        "smart_money_thesis": "Cannot establish institutional thesis without OI data - significant analytical handicap",
+        "technical_levels": {
+          "support": "300.00",
+          "resistance": "343.89",
+          "pivot": "320.47"
+        },
+        "momentum_indicators": "RSI oversold on all timeframes (40.85 daily, 42.75 15m, 37.01 1m), MACD negative on daily",
+        "volume_analysis": "Mixed signals - OBV positive on daily/15m but negative on 1m, CMF negative on longer timeframes",
+        "multi_timeframe_summary": "Daily strong downtrend, 15m showing bullish divergence and potential bounce, 1m bearish with distribution"
+      },
+      {
+        "ticker": "HIMS",
+        "confidence": "65% - based purely on technical confluence due to missing OI data",
+        "success_probability": "65% based on technical momentum and multi-timeframe bearish alignment",
+        "pattern_type": "distribution",
+        "pattern_strength": "moderate",
+        "entry": "Long PUT strike 47.50 targeting continuation of established downtrend",
+        "target": "4.50",
+        "stop_loss": "1.50",
+        "risk_reward": "1:2.0",
+        "expiry": "2025-09-10",
+        "dte": 30,
+        "position_size": "2% of portfolio given moderate confidence without OI confirmation",
+        "current_price": 49.97,
+        "supporting_evidence": [
+          "Bearish divergence on daily RSI indicating weakening momentum",
+          "Price below cloud on 5m and 1m Ichimoku suggesting bearish sentiment",
+          "Strong downtrend classification on 5m timeframe with ADX 30.3",
+          "Negative CMF on 5m timeframe showing distribution"
+        ],
+        "timeframe_confluence": "Bearish alignment across all timeframes - daily strong downtrend, 5m strong downtrend, 1m neutral but below key levels",
+        "volatility_regime": "Medium volatility with ATR 4.30 on daily timeframe suggesting moderate risk environment",
+        "entry_triggers": [
+          "Break below 49.50 support level with volume confirmation",
+          "RSI remaining below 45 on intraday timeframes"
+        ],
+        "institutional_flow": "Unable to determine due to missing OI data - recommend using alternative flow indicators like dark pool prints and block trades",
+        "smart_money_thesis": "Technical patterns suggest institutional distribution phase with coordinated selling pressure across timeframes",
+        "technical_levels": {
+          "support": "47.50",
+          "resistance": "52.00",
+          "pivot": "50.00"
+        },
+        "momentum_indicators": "RSI oversold but not yet showing bullish divergence, MACD negative across timeframes, Stochastic extremely low suggesting washout conditions",
+        "volume_analysis": "Mixed signals - bullish volume patterns but negative OBV and CMF on shorter timeframes suggest distribution",
+        "multi_timeframe_summary": "Strong bearish alignment - daily in confirmed downtrend, 5m showing strong downtrend continuation, 1m neutral but structurally weak"
+      },
+      {
+        "ticker": "OSCR",
+        "confidence": "65% - Technical patterns clear but lack of OI data reduces conviction",
+        "success_probability": "62% based on technical momentum and volume patterns",
+        "pattern_type": "distribution",
+        "pattern_strength": "moderate",
+        "entry": "Long Put at 15.00 strike targeting breakdown below daily support",
+        "target": "1.50",
+        "stop_loss": "0.35",
+        "risk_reward": "1:1.9",
+        "expiry": "2025-09-12",
+        "dte": 30,
+        "position_size": "2% maximum due to liquidity constraints",
+        "current_price": "15.63",
+        "supporting_evidence": [
+          "Consistent selling pressure across multiple timeframes",
+          "Bearish Ichimoku cloud formation on daily chart",
+          "Negative money flow with CMF at -0.5053 on 1-minute",
+          "Price rejection at 50-day SMA resistance level"
+        ],
+        "timeframe_confluence": "1m showing strong bearish momentum, 5m mixed signals, 1d showing distribution pattern - net bearish",
+        "volatility_regime": "High volatility environment based on ATR readings and intraday price swings",
+        "entry_triggers": [
+          "Break below 15.50 support with volume confirmation",
+          "RSI remaining below 40 on hourly timeframe"
+        ],
+        "institutional_flow": "Minimal institutional options presence - retail dominated with limited smart money footprint",
+        "smart_money_thesis": "Institutions appear to be avoiding OSCR entirely - no significant options positioning detected",
+        "technical_levels": {
+          "support": "14.63",
+          "resistance": "15.78",
+          "pivot": "15.16"
+        },
+        "momentum_indicators": "RSI showing oversold conditions on 1m (31.3) but neutral on daily (54.2), MACD bearish across timeframes",
+        "volume_analysis": "OBV negative on short timeframes indicating selling pressure, CMF consistently negative showing money outflow",
+        "multi_timeframe_summary": "1m bearish with 53.26 ADX, 5m showing mixed signals with bearish divergence, 1d showing distribution below key MAs"
+      },
+      {
+        "ticker": "UNH",
+        "confidence": "65% - Limited by lack of OI data but strong technical confirmation",
+        "success_probability": "68% based on strong technical momentum and trend strength",
+        "pattern_type": "distribution",
+        "pattern_strength": "strong",
+        "entry": "Buy UNH 240 Put with 30 DTE targeting continuation of technical breakdown",
+        "target": "235.00",
+        "stop_loss": "265.00",
+        "risk_reward": "1:2.3",
+        "expiry": "2025-09-12",
+        "dte": 30,
+        "position_size": "3% given high volatility environment and data limitations",
+        "current_price": "252.59",
+        "supporting_evidence": [
+          "Strong downtrend confirmed by ADX 66.5 across daily timeframe",
+          "Price below all key moving averages indicating trend persistence",
+          "Negative Chaikin Money Flow suggesting institutional outflows",
+          "RSI 37.6 showing oversold but not yet at extreme levels"
+        ],
+        "timeframe_confluence": "All timeframes bearish - 1d strong downtrend, 5m downtrend, 1m showing some stabilization but below VWAP",
+        "volatility_regime": "High volatility environment with ATR 9.51 suggesting elevated uncertainty",
+        "entry_triggers": [
+          "Bounce to 258-260 resistance zone for better entry",
+          "RSI failure at 45-50 level on any relief rally",
+          "Volume confirmation on next leg down"
+        ],
+        "institutional_flow": "Unable to determine smart money positioning due to missing OI data - relying on volume analysis showing net selling pressure",
+        "smart_money_thesis": "Without OI data, inferring continued distribution based on persistent selling volume and technical breakdown",
+        "technical_levels": {
+          "support": "245.00",
+          "resistance": "265.42",
+          "pivot": "255.00"
+        },
+        "momentum_indicators": "RSI 37.6 oversold but not extreme, MACD negative, Stochastic showing oversold conditions across timeframes",
+        "volume_analysis": "OBV negative suggesting accumulative selling, CMF -0.26 confirming money flow out of stock",
+        "multi_timeframe_summary": "Strong bearish alignment - daily showing strong downtrend with ADX 66.5, intraday timeframes showing some stabilization but below key levels"
+      }
+    ],
+    "avg_confidence": 52.142857142857146,
+    "avg_success_probability": 59.285714285714285,
+    "pattern_types": {
+      "strong_downtrend_continuation": 1,
+      "distribution": 4,
+      "other": 2
+    },
+    "total_count": 7
+  },
+  "clustering_timestamp": "2025-08-11T17:54:27.173840",
+  "total_analyzed": 19,
+  "summary": {
+    "distribution": {
+      "bullish_signals": 9,
+      "bearish_signals": 7,
+      "total_processed": 19
+    },
+    "success_rates": {
+      "bullish_avg_probability": 46.111111111111114,
+      "bearish_avg_probability": 59.285714285714285
+    },
+    "dominant_patterns": {
+      "bullish": "other",
+      "bearish": "distribution"
+    },
+    "market_bias": "mixed_56%_bullish"
+  }
+}

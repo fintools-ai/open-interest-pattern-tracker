@@ -1,0 +1,48 @@
+{
+  "date": "2025-08-10",
+  "timestamp": "2025-08-10T20:18:41.444901",
+  "total_analyzed": 1,
+  "clustering_summary": {
+    "distribution": {
+      "bullish_signals": 0,
+      "bearish_signals": 1,
+      "neutral_or_filtered": 0,
+      "total_processed": 1
+    },
+    "success_rates": {
+      "bullish_avg_probability": 0,
+      "bearish_avg_probability": 78.0
+    },
+    "dominant_patterns": {
+      "bullish": "none",
+      "bearish": "protective_hedging"
+    },
+    "market_bias": "bearish_bias_100%"
+  },
+  "high_conviction_trades": [
+    {
+      "ticker": "SPY",
+      "pattern_type": "Protective Hedging",
+      "direction": "bearish",
+      "confidence": "82%",
+      "entry": "SPY Sept 30 2025 $620 Put",
+      "target": "$15.00",
+      "stop_loss": "$5.50",
+      "risk_reward": "1:2.2",
+      "expiry": "2025-09-30",
+      "dte": 40,
+      "success_prob": "78%",
+      "current_price": "N/A",
+      "supporting_evidence": [
+        "Sep 30 expiry showing 4.09 put/call OI ratio with massive 805K put open interest",
+        "VIX options positioning defensive with high fear levels",
+        "Multiple expiries showing max pain below current price levels",
+        "Heavy concentration in 485-490 put strikes suggesting major downside hedging"
+      ],
+      "timeframe_confluence": "N/A",
+      "entry_triggers": [],
+      "technical_levels": {},
+      "volatility_regime": "N/A"
+    }
+  ]
+}

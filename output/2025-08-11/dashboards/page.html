@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OI Pattern Tracker - Daily Analysis</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #e0e0e0; line-height: 1.5; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #333; }
+        .logo { font-size: 28px; font-weight: 700; color: #fff; }
+        .header-stats { display: flex; gap: 40px; }
+        .header-stat { text-align: center; }
+        .stat-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+        .stat-value { font-size: 20px; font-weight: 700; color: #fff; }
+        .stat-value.green { color: #00ff88; }
+        .stat-value.red { color: #ff4444; }
+        .stat-value.yellow { color: #ffaa00; }
+        .market-pulse { background: #111; border: 1px solid #333; border-radius: 12px; padding: 25px; margin-bottom: 25px; }
+        .section-title { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 20px; display: flex; align-items: center; }
+        .pulse-icon { width: 8px; height: 8px; background: #00ff88; border-radius: 50%; margin-right: 10px; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .pulse-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; }
+        .pulse-card { background: #1a1a1a; padding: 20px; border-radius: 8px; border: 1px solid #333; }
+        .pulse-metric { font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 8px; }
+        .pulse-value { font-size: 18px; font-weight: 600; }
+        .pulse-change { font-size: 12px; margin-top: 4px; }
+        .positive { color: #00ff88; }
+        .negative { color: #ff4444; }
+        .conviction-section { background: #111; border: 1px solid #333; border-radius: 12px; padding: 25px; margin-bottom: 25px; }
+        .trade-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        .trade-card { background: #1a1a1a; border: 2px solid #333; border-radius: 10px; padding: 20px; position: relative; overflow: hidden; }
+        .trade-card.bullish { border-left: 4px solid #00ff88; }
+        .trade-card.bearish { border-left: 4px solid #ff4444; }
+
+        .trade-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
+        .ticker { font-size: 24px; font-weight: 700; color: #fff; }
+        .confidence-badge { background: #00ff88; color: #000; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .confidence-badge.bearish { background: #ff4444; color: #fff; }
+
+        .pattern-type { color: #00ff88; font-size: 14px; font-weight: 500; margin-bottom: 15px; text-transform: uppercase; }
+        .pattern-type.bearish { color: #ff4444; }
+
+        .trade-details { background: #0a0a0a; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .trade-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .trade-label { color: #888; font-size: 13px; }
+        .trade-value { color: #fff; font-weight: 500; font-size: 13px; }
+        .evidence-list { list-style: none; margin-top: 15px; }
+        .evidence-list li { font-size: 12px; color: #ccc; padding: 4px 0; padding-left: 15px; position: relative; }
+        .evidence-list li:before { content: "•"; color: #00ff88; position: absolute; left: 0; }
+        .recommendations-section { background: #111; border: 1px solid #333; border-radius: 12px; padding: 25px; margin-bottom: 25px; }
+        .recommendations-table { width: 100%; border-collapse: collapse; background: #1a1a1a; border-radius: 8px; overflow: hidden; }
+        .recommendations-table th { background: #0a0a0a; padding: 15px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 600; border-bottom: 1px solid #333; }
+        .recommendations-table td { padding: 15px 12px; border-bottom: 1px solid #222; font-size: 14px; }
+        .recommendations-table tr:hover { background: #222; }
+        .ticker-cell { font-weight: 700; font-size: 16px; color: #fff; }
+        .direction-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+        .direction-badge.call { background: #00ff88; color: #000; }
+        .direction-badge.put { background: #ff4444; color: #fff; }
+        .probability-cell { font-weight: 700; font-size: 16px; }
+        .risk-section { background: #111; border: 1px solid #333; border-radius: 12px; padding: 25px; margin-bottom: 25px; }
+        .risk-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .risk-card { background: #1a1a1a; padding: 20px; border-radius: 8px; text-align: center; border: 1px solid #333; }
+        .risk-metric { font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 10px; }
+        .risk-value { font-size: 22px; font-weight: 700; }
+        .footer { text-align: center; padding: 20px; border-top: 1px solid #333; margin-top: 40px; color: #666; font-size: 12px; }
+        .last-update { color: #888; font-size: 11px; text-align: right; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div class="logo">OI Pattern Tracker</div>
+        <div class="header-stats">
+            <div class="header-stat">
+                <div class="stat-label">Patterns Found</div>
+                <div class="stat-value">1</div>
+            </div>
+            <div class="header-stat">
+                <div class="stat-label">Stocks Analyzed</div>
+                <div class="stat-value">1</div>
+            </div>
+            <div class="header-stat">
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-value green">68.0%</div>
+            </div>
+            <div class="header-stat">
+                <div class="stat-label">Active Signals</div>
+                <div class="stat-value yellow">1</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="market-pulse">
+        <div class="section-title">
+            <div class="pulse-icon"></div>
+            Market Pulse - August 11, 2025 at 10:51 AM ET
+        </div>
+        <div class="pulse-grid">
+            <div class="pulse-card">
+                <div class="pulse-metric">Overall Sentiment</div>
+                <div class="pulse-value positive">BEARISH 100%</div>
+                <div class="pulse-change positive">-3% vs yesterday</div>
+            </div>
+            <div class="pulse-card">
+                <div class="pulse-metric">Institutional Flow</div>
+                <div class="pulse-value positive">↑ $-0.3B Net Puts</div>
+                <div class="pulse-change positive">+$850M from Friday</div>
+            </div>
+            <div class="pulse-card">
+                <div class="pulse-metric">VIX Level</div>
+                <div class="pulse-value">0.55</div>
+                <div class="pulse-change">N/A</div>
+            </div>
+            <div class="pulse-card">
+                <div class="pulse-metric">Key Events</div>
+                <div class="pulse-value">High volatility expectation, defensive positioning recommended. Elevated fear levels in options market.</div>
+            </div>
+            <div class="pulse-card">
+                <div class="pulse-metric">Gamma Exposure</div>
+                <div class="pulse-value">$-0.3B (Short gamma setup)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="conviction-section">
+        <div class="section-title">🎯 High Conviction Trades</div>
+        <div class="trade-cards">
+
+            <div class="trade-card bearish">
+                <div class="trade-header">
+                    <div class="ticker">SPY <span style="font-size: 16px; color: #888; font-weight: 400;">$637.44</span></div>
+                    <div class="confidence-badge bearish">72% CONFIDENCE</div>
+                </div>
+                <div class="pattern-type bearish">Protective Hedging</div>
+                <div class="trade-details">
+                    <div class="trade-row">
+                        <span class="trade-label">Entry:</span>
+                        <span class="trade-value">SPY 620 Put expiring Sep 12 2025</span>
+                    </div>
+                    <div class="trade-row">
+                        <span class="trade-label">Target:</span>
+                        <span class="trade-value">600</span>
+                    </div>
+                    <div class="trade-row">
+                        <span class="trade-label">Stop Loss:</span>
+                        <span class="trade-value">645</span>
+                    </div>
+                    <div class="trade-row">
+                        <span class="trade-label">Risk/Reward:</span>
+                        <span class="trade-value">1:2.5</span>
+                    </div>
+                    <div class="trade-row">
+                        <span class="trade-label">Expiry:</span>
+                        <span class="trade-value">2025-09-12 (30 DTE)</span>
+                    </div>
+                    <div class="trade-row">
+                        <span class="trade-label">Success Probability:</span>
+                        <span class="trade-value negative">68%</span>
+                    </div>
+                    <div class="trade-row">
+                        <span class="trade-label">Timeframe Confluence:</span>
+                        <span class="trade-value">1d shows strong uptrend but massive put OI buildup suggests reversal, 1m and 5m showing weakening momentum</span>
+                    </div>
+                    <div class="trade-row">
+                        <span class="trade-label">Volatility Regime:</span>
+                        <span class="trade-value">High volatility environment with elevated fear levels</span>
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Smart Money Analysis:</div>
+                    <div style="font-size: 12px; color: #ccc; margin-bottom: 8px;">Massive institutional put buying across multiple timeframes - smart money positioning for significant downside move</div>
+                    <div style="font-size: 11px; color: #aaa;">Institutions are aggressively hedging long positions or positioning for major market correction based on unprecedented put accumulation</div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Entry Triggers:</div>
+                    <div style="font-size: 12px; color: #ccc;">
+
+                        <span style="background: #333; padding: 2px 8px; border-radius: 4px; margin-right: 8px; margin-bottom: 4px; display: inline-block;">Break below 635 support level</span>
+
+                        <span style="background: #333; padding: 2px 8px; border-radius: 4px; margin-right: 8px; margin-bottom: 4px; display: inline-block;">Increase in put volume at 620 strike</span>
+
+                        <span style="background: #333; padding: 2px 8px; border-radius: 4px; margin-right: 8px; margin-bottom: 4px; display: inline-block;">VIX spike above current levels</span>
+
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Key Levels:</div>
+                    <div style="font-size: 12px; color: #ccc;">
+                        <span style="background: #1a4d1a; padding: 2px 8px; border-radius: 4px; margin-right: 8px;">Support: 635</span>
+                        <span style="background: #4d1a1a; padding: 2px 8px; border-radius: 4px; margin-right: 8px;">Resistance: 645</span>
+                        <span style="background: #4d4d1a; padding: 2px 8px; border-radius: 4px;">Pivot: 637</span>
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 12px; color: #888; margin-bottom: 8px; text-transform: uppercase;">Supporting Evidence:</div>
+                    <ul class="evidence-list">
+
+                        <li>Put/call ratio of 4.12 on Aug 15 expiration</li>
+
+                        <li>Massive 211,917 put OI at 475 strike on Sep 19</li>
+
+                        <li>Consistent put accumulation across all timeframes</li>
+
+                        <li>VIX put/call ratio of 0.55 indicating high fear</li>
+
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+
+    <div class="recommendations-section">
+        <div class="section-title">📋 Complete Trade Recommendations</div>
+        <table class="recommendations-table">
+            <thead>
+            <tr>
+                <th>Ticker</th>
+                <th>Pattern</th>
+                <th>Direction</th>
+                <th>Entry</th>
+                <th>Target</th>
+                <th>Expiry</th>
+                <th>Success Prob</th>
+                <th>R/R</th>
+            </tr>
+            </thead>
+            <tbody>
+
+            <tr>
+                <td class="ticker-cell">SPY</td>
+                <td>Protective Hedging</td>
+                <td><span class="direction-badge put">PUT</span></td>
+                <td>SPY 620 Put expiring Sep 12 2025</td>
+                <td>600</td>
+                <td>2025-09-12 (30 DTE)</td>
+                <td class="probability-cell negative">68%</td>
+                <td>1:2.5</td>
+            </tr>
+
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        <div>OI Pattern Tracker v2.0 | Institutional-grade options flow analysis</div>
+        <div class="last-update">Last updated: August 11, 2025 at 10:51 AM ET | Next analysis: 4:15 PM ET tomorrow</div>
+    </div>
+</div>
+</body>
+</html>

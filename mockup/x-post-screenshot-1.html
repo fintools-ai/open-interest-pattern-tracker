@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OI Pattern Tracker - Main Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .dashboard-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            border-radius: 12px;
+        }
+        
+        .dashboard-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #00ff88;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+        
+        .dashboard-subtitle {
+            color: #aaa;
+            font-size: 14px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: #111;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #00ff88;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        .trades-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .trade-card {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .trade-card:hover {
+            transform: translateY(-5px);
+            border-color: #00ff88;
+            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.2);
+        }
+        
+        .ticker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .ticker-symbol {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+        }
+        
+        .confidence-badge {
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .pattern-type {
+            background: #222;
+            padding: 8px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .bullish { border-left: 4px solid #00ff88; }
+        .bearish { border-left: 4px solid #ff4444; }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .metric {
+            background: #0a0a0a;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        
+        .metric-label {
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .metric-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .analyze-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+            color: #000;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .analyze-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.4);
+        }
+        
+        .live-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ff4444;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        }
+        
+        .alert-banner {
+            background: linear-gradient(90deg, #ff6b6b, #feca57);
+            color: #000;
+            padding: 10px;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="dashboard-title">🚀 OI Pattern Tracker</div>
+        <div class="dashboard-subtitle">Real-Time Options Flow Analysis • Powered by AI</div>
+    </div>
+    
+    <div class="alert-banner">
+        🔥 Unusual Activity Detected: SPY, NVDA, TSLA showing smart money accumulation
+    </div>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">24</div>
+            <div class="stat-label">Patterns Detected</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">85%</div>
+            <div class="stat-label">Avg Confidence</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">1.2s</div>
+            <div class="stat-label">Avg Response Time</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">$2.3M</div>
+            <div class="stat-label">Smart Money Flow</div>
+        </div>
+    </div>
+    
+    <div class="trades-grid">
+        <div class="trade-card">
+            <div class="live-indicator"></div>
+            <div class="ticker-header">
+                <span class="ticker-symbol">SPY</span>
+                <span class="confidence-badge">92%</span>
+            </div>
+            <div class="pattern-type bullish">
+                📈 Bullish Accumulation Pattern
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Put/Call Ratio</div>
+                    <div class="metric-value">0.65</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Smart Money</div>
+                    <div class="metric-value">+$850K</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Entry Level</div>
+                    <div class="metric-value">447.50</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Target</div>
+                    <div class="metric-value">452.00</div>
+                </div>
+            </div>
+            <button class="analyze-btn">🤖 Start Interactive Analysis</button>
+        </div>
+        
+        <div class="trade-card">
+            <div class="live-indicator"></div>
+            <div class="ticker-header">
+                <span class="ticker-symbol">NVDA</span>
+                <span class="confidence-badge">88%</span>
+            </div>
+            <div class="pattern-type bullish">
+                🎯 Call Sweep Detected
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Put/Call Ratio</div>
+                    <div class="metric-value">0.42</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Smart Money</div>
+                    <div class="metric-value">+$1.2M</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Entry Level</div>
+                    <div class="metric-value">485.00</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Target</div>
+                    <div class="metric-value">495.00</div>
+                </div>
+            </div>
+            <button class="analyze-btn">🤖 Start Interactive Analysis</button>
+        </div>
+        
+        <div class="trade-card">
+            <div class="live-indicator"></div>
+            <div class="ticker-header">
+                <span class="ticker-symbol">TSLA</span>
+                <span class="confidence-badge">79%</span>
+            </div>
+            <div class="pattern-type bearish">
+                📉 Put Wall Building
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Put/Call Ratio</div>
+                    <div class="metric-value">1.85</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Smart Money</div>
+                    <div class="metric-value">-$450K</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Entry Level</div>
+                    <div class="metric-value">238.00</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Target</div>
+                    <div class="metric-value">230.00</div>
+                </div>
+            </div>
+            <button class="analyze-btn">🤖 Start Interactive Analysis</button>
+        </div>
+        
+        <div class="trade-card">
+            <div class="ticker-header">
+                <span class="ticker-symbol">AMD</span>
+                <span class="confidence-badge">94%</span>
+            </div>
+            <div class="pattern-type bullish">
+                🚀 Gamma Squeeze Setup
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Put/Call Ratio</div>
+                    <div class="metric-value">0.38</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Smart Money</div>
+                    <div class="metric-value">+$2.1M</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Entry Level</div>
+                    <div class="metric-value">142.50</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Target</div>
+                    <div class="metric-value">150.00</div>
+                </div>
+            </div>
+            <button class="analyze-btn">🤖 Start Interactive Analysis</button>
+        </div>
+    </div>
+</body>
+</html>

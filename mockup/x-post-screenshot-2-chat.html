@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OI Pattern Tracker - Interactive AI Analysis</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #fff;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .chat-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        
+        .chat-header {
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+            padding: 20px;
+            color: #000;
+        }
+        
+        .chat-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .chat-subtitle {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .ticker-info {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .info-pill {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .chat-messages {
+            height: 500px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #0a0a0a;
+        }
+        
+        .message {
+            margin-bottom: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .user-message {
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            padding: 15px;
+            border-radius: 12px;
+            margin-left: 100px;
+            position: relative;
+        }
+        
+        .ai-message {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 12px;
+            border-left: 4px solid #00ff88;
+            margin-right: 50px;
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #888;
+        }
+        
+        .message-author {
+            font-weight: 600;
+        }
+        
+        .tools-used {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .tool-badge {
+            background: #222;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .tool-success { color: #00ff88; }
+        .tool-time { color: #666; }
+        
+        .message-content {
+            line-height: 1.6;
+            color: #fff;
+        }
+        
+        .message-content h3 {
+            color: #00ff88;
+            margin: 15px 0 10px 0;
+            font-size: 16px;
+        }
+        
+        .message-content ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .message-content li {
+            margin: 5px 0;
+        }
+        
+        .message-content strong {
+            color: #00ff88;
+        }
+        
+        .code-block {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+        }
+        
+        .highlight {
+            background: rgba(0, 255, 136, 0.2);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        .chat-input-container {
+            background: #1a1a1a;
+            padding: 20px;
+            border-top: 1px solid #333;
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input {
+            flex: 1;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .chat-input:focus {
+            outline: none;
+            border-color: #00ff88;
+        }
+        
+        .send-btn {
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        
+        .suggestions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .suggestion {
+            background: #222;
+            color: #888;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .suggestion:hover {
+            background: #333;
+            color: #00ff88;
+        }
+        
+        .loading-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #888;
+            padding: 10px;
+        }
+        
+        .loading-dots {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        
+        .metric-table {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .metric-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .metric-table th {
+            background: #1a1a1a;
+            padding: 8px;
+            text-align: left;
+            font-size: 12px;
+            color: #00ff88;
+            border-bottom: 1px solid #333;
+        }
+        
+        .metric-table td {
+            padding: 8px;
+            font-size: 13px;
+            border-bottom: 1px solid #222;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="chat-title">🤖 Interactive AI Analysis: SPY</div>
+            <div class="chat-subtitle">Real-time options flow analysis powered by Claude</div>
+            <div class="ticker-info">
+                <span class="info-pill">📈 Bullish Pattern</span>
+                <span class="info-pill">92% Confidence</span>
+                <span class="info-pill">Session: oi_spy_1703421245</span>
+            </div>
+        </div>
+        
+        <div class="chat-messages">
+            <div class="message">
+                <div class="ai-message">
+                    <div class="message-header">
+                        <span class="message-author">AI Assistant</span>
+                        <span>10:32 AM</span>
+                    </div>
+                    <div class="message-content">
+                        <strong>Welcome to SPY Interactive Analysis!</strong><br><br>
+                        I've loaded your current analysis showing a <span class="highlight">bullish accumulation pattern</span> with 92% confidence. 
+                        I can fetch real-time OI data, analyze custom DTE options, or explain the current setup.<br><br>
+                        What would you like to explore?
+                    </div>
+                </div>
+            </div>
+            
+            <div class="message">
+                <div class="user-message">
+                    <div class="message-header">
+                        <span class="message-author">You</span>
+                        <span>10:33 AM</span>
+                    </div>
+                    <div class="message-content">
+                        Get fresh OI data for SPY and show me unusual activity
+                    </div>
+                </div>
+            </div>
+            
+            <div class="message">
+                <div class="ai-message">
+                    <div class="message-header">
+                        <span class="message-author">AI Assistant</span>
+                        <div class="tools-used">
+                            <span class="tool-badge">
+                                <span class="tool-success">✅</span> get_live_oi_data
+                                <span class="tool-time">(1.2s)</span>
+                            </span>
+                            <span class="tool-badge">
+                                <span class="tool-success">✅</span> get_market_data
+                                <span class="tool-time">(0.8s)</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="message-content">
+                        <h3>🔥 SPY Unusual Activity Detected</h3>
+                        
+                        <strong>Current Price:</strong> $447.85 (+0.65%)<br>
+                        <strong>Volume:</strong> 2.3x average (bullish)<br><br>
+                        
+                        <h3>Key Unusual Activity (Last Hour):</h3>
+                        <ul>
+                            <li><strong>10:15 AM:</strong> SWEEP - 8,000x 450C exp Friday ($1.2M premium)</li>
+                            <li><strong>10:22 AM:</strong> BLOCK - 5,000x 448C exp today ($400K premium)</li>
+                            <li><strong>10:28 AM:</strong> Aggressive buying 452C weekly (+15K OI)</li>
+                        </ul>
+                        
+                        <div class="metric-table">
+                            <table>
+                                <tr>
+                                    <th>Strike</th>
+                                    <th>Type</th>
+                                    <th>OI Change</th>
+                                    <th>Volume</th>
+                                    <th>Signal</th>
+                                </tr>
+                                <tr>
+                                    <td>450</td>
+                                    <td>Call</td>
+                                    <td style="color: #00ff88">+12,500</td>
+                                    <td>45,230</td>
+                                    <td>🔥 Hot</td>
+                                </tr>
+                                <tr>
+                                    <td>448</td>
+                                    <td>Call</td>
+                                    <td style="color: #00ff88">+8,200</td>
+                                    <td>22,150</td>
+                                    <td>📈 Bullish</td>
+                                </tr>
+                                <tr>
+                                    <td>445</td>
+                                    <td>Put</td>
+                                    <td style="color: #ff4444">-3,100</td>
+                                    <td>8,420</td>
+                                    <td>🛡️ Support</td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <h3>Smart Money Interpretation:</h3>
+                        <ul>
+                            <li>Large institutions are <strong>aggressively accumulating</strong> 450 calls</li>
+                            <li>Put selling at 445 creates strong support (max pain)</li>
+                            <li>Gamma positioning suggests move to 450+ likely</li>
+                        </ul>
+                        
+                        <div class="code-block">
+                        <strong>Trade Setup:</strong><br>
+                        Entry: $447.50-448.00<br>
+                        Target 1: $450.00 (high OI)<br>
+                        Target 2: $452.00 (gamma wall)<br>
+                        Stop Loss: $446.00 (below support)<br>
+                        Risk/Reward: 1:3.5
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="message">
+                <div class="user-message">
+                    <div class="message-header">
+                        <span class="message-author">You</span>
+                        <span>10:34 AM</span>
+                    </div>
+                    <div class="message-content">
+                        What about 45 DTE options? Any smart money positioning there?
+                    </div>
+                </div>
+            </div>
+            
+            <div class="message">
+                <div class="ai-message">
+                    <div class="message-header">
+                        <span class="message-author">AI Assistant</span>
+                        <div class="tools-used">
+                            <span class="tool-badge">
+                                <span class="tool-success">✅</span> get_live_oi_data
+                                <span class="tool-time">(1.4s)</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="message-content">
+                        <h3>📊 SPY 45 DTE Analysis (Feb 28 Expiry)</h3>
+                        
+                        <strong>Significant Positioning Detected:</strong><br><br>
+                        
+                        <div class="metric-table">
+                            <table>
+                                <tr>
+                                    <th>Strike</th>
+                                    <th>Call OI</th>
+                                    <th>Put OI</th>
+                                    <th>Net Premium</th>
+                                    <th>Interpretation</th>
+                                </tr>
+                                <tr>
+                                    <td>460</td>
+                                    <td style="color: #00ff88">85,000</td>
+                                    <td>12,000</td>
+                                    <td>+$42M</td>
+                                    <td>🎯 Major Target</td>
+                                </tr>
+                                <tr>
+                                    <td>455</td>
+                                    <td style="color: #00ff88">62,000</td>
+                                    <td>8,500</td>
+                                    <td>+$28M</td>
+                                    <td>📈 Accumulation</td>
+                                </tr>
+                                <tr>
+                                    <td>440</td>
+                                    <td>15,000</td>
+                                    <td style="color: #ff4444">95,000</td>
+                                    <td>-$35M</td>
+                                    <td>🛡️ Put Wall</td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <h3>Key Insights:</h3>
+                        <ul>
+                            <li><strong>Massive call skew</strong> at 460 strike - institutions expecting +3% move</li>
+                            <li><strong>Put wall at 440</strong> - smart money selling puts for income (bullish)</li>
+                            <li><strong>Risk reversal trades</strong> detected: Selling 440P, buying 460C</li>
+                            <li>Implied move: SPY to 455-460 range by expiry</li>
+                        </ul>
+                        
+                        <strong>Recommended Strategy:</strong><br>
+                        Consider 455/460 call spread for Feb 28 expiry<br>
+                        • Buy 455C @ $5.20<br>
+                        • Sell 460C @ $3.10<br>
+                        • Net debit: $2.10<br>
+                        • Max profit: $2.90 (138% return)<br>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="loading-indicator">
+                <span>AI is thinking</span>
+                <div class="loading-dots">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-input-container">
+            <div class="input-row">
+                <input type="text" class="chat-input" placeholder="Ask about gamma levels, risk scenarios, or request specific analysis...">
+                <button class="send-btn">Analyze</button>
+            </div>
+            <div class="suggestions">
+                <div class="suggestion">What's the gamma exposure?</div>
+                <div class="suggestion">Show 0DTE opportunities</div>
+                <div class="suggestion">Compare to yesterday's flow</div>
+                <div class="suggestion">Risk management levels</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

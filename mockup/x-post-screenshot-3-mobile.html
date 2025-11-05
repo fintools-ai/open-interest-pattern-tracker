@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OI Tracker - Mobile View</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            width: 375px;
+            margin: 0 auto;
+            border: 2px solid #333;
+            border-radius: 40px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        }
+        
+        .mobile-header {
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+            padding: 15px;
+            color: #000;
+            text-align: center;
+            position: relative;
+        }
+        
+        .mobile-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        .mobile-subtitle {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 2px;
+        }
+        
+        .quick-stats {
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            background: #111;
+            border-bottom: 1px solid #333;
+        }
+        
+        .quick-stat {
+            text-align: center;
+        }
+        
+        .stat-val {
+            font-size: 20px;
+            font-weight: 700;
+            color: #00ff88;
+        }
+        
+        .stat-lbl {
+            font-size: 10px;
+            color: #666;
+            margin-top: 2px;
+        }
+        
+        .mobile-content {
+            height: 600px;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        .mobile-card {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .ticker {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .confidence {
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+            color: #000;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .pattern {
+            background: #222;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            border-left: 3px solid #00ff88;
+        }
+        
+        .quick-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .metric-item {
+            background: #0a0a0a;
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        
+        .metric-label {
+            color: #666;
+            font-size: 9px;
+        }
+        
+        .metric-value {
+            color: #fff;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        
+        .analyze-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+            color: #000;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 13px;
+        }
+        
+        .chat-view {
+            display: none;
+            height: 100%;
+            background: #0a0a0a;
+        }
+        
+        .chat-header {
+            background: #1a1a1a;
+            padding: 15px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .back-btn {
+            background: none;
+            border: none;
+            color: #00ff88;
+            font-size: 20px;
+        }
+        
+        .chat-ticker {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .chat-messages {
+            height: 450px;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        .msg {
+            margin-bottom: 15px;
+        }
+        
+        .user-msg {
+            background: #1e3c72;
+            padding: 10px;
+            border-radius: 10px;
+            margin-left: 50px;
+            font-size: 13px;
+        }
+        
+        .ai-msg {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 10px;
+            border-left: 3px solid #00ff88;
+            margin-right: 20px;
+            font-size: 13px;
+        }
+        
+        .msg-time {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .tool-indicator {
+            display: inline-block;
+            background: #222;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            color: #00ff88;
+            margin-top: 5px;
+        }
+        
+        .chat-input-area {
+            padding: 10px;
+            background: #1a1a1a;
+            border-top: 1px solid #333;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .mobile-input {
+            flex: 1;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 10px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+        
+        .send-button {
+            background: #00ff88;
+            color: #000;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-weight: 700;
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+            overflow-x: auto;
+        }
+        
+        .quick-action {
+            background: #222;
+            color: #888;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: #ff4444;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .bottom-nav {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px;
+            background: #111;
+            border-top: 1px solid #333;
+        }
+        
+        .nav-item {
+            text-align: center;
+            color: #666;
+            font-size: 10px;
+        }
+        
+        .nav-item.active {
+            color: #00ff88;
+        }
+        
+        .nav-icon {
+            font-size: 20px;
+            margin-bottom: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-header">
+        <div class="mobile-title">🚀 OI Pattern Tracker</div>
+        <div class="mobile-subtitle">Real-Time Analysis • <span class="live-dot"></span> Live</div>
+    </div>
+    
+    <div class="quick-stats">
+        <div class="quick-stat">
+            <div class="stat-val">18</div>
+            <div class="stat-lbl">Signals</div>
+        </div>
+        <div class="quick-stat">
+            <div class="stat-val">87%</div>
+            <div class="stat-lbl">Avg Conf</div>
+        </div>
+        <div class="quick-stat">
+            <div class="stat-val">1.1s</div>
+            <div class="stat-lbl">Response</div>
+        </div>
+    </div>
+    
+    <div class="mobile-content">
+        <div class="mobile-card">
+            <div class="card-header">
+                <span class="ticker">SPY</span>
+                <span class="confidence">92%</span>
+            </div>
+            <div class="pattern">📈 Bullish Accumulation</div>
+            <div class="quick-metrics">
+                <div class="metric-item">
+                    <div class="metric-label">P/C Ratio</div>
+                    <div class="metric-value">0.65</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Smart $</div>
+                    <div class="metric-value">+850K</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Entry</div>
+                    <div class="metric-value">447.50</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Target</div>
+                    <div class="metric-value">452.00</div>
+                </div>
+            </div>
+            <button class="analyze-btn">🤖 Quick Analysis</button>
+        </div>
+        
+        <div class="mobile-card">
+            <div class="card-header">
+                <span class="ticker">NVDA</span>
+                <span class="confidence">88%</span>
+            </div>
+            <div class="pattern">🎯 Call Sweep</div>
+            <div class="quick-metrics">
+                <div class="metric-item">
+                    <div class="metric-label">P/C Ratio</div>
+                    <div class="metric-value">0.42</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Smart $</div>
+                    <div class="metric-value">+1.2M</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Entry</div>
+                    <div class="metric-value">485.00</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Target</div>
+                    <div class="metric-value">495.00</div>
+                </div>
+            </div>
+            <button class="analyze-btn">🤖 Quick Analysis</button>
+        </div>
+        
+        <div class="mobile-card">
+            <div class="card-header">
+                <span class="ticker">TSLA</span>
+                <span class="confidence">79%</span>
+            </div>
+            <div class="pattern">📉 Put Wall Building</div>
+            <div class="quick-metrics">
+                <div class="metric-item">
+                    <div class="metric-label">P/C Ratio</div>
+                    <div class="metric-value">1.85</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Smart $</div>
+                    <div class="metric-value">-450K</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Entry</div>
+                    <div class="metric-value">238.00</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Target</div>
+                    <div class="metric-value">230.00</div>
+                </div>
+            </div>
+            <button class="analyze-btn">🤖 Quick Analysis</button>
+        </div>
+    </div>
+    
+    <!-- Chat View (Hidden by default) -->
+    <div class="chat-view">
+        <div class="chat-header">
+            <button class="back-btn">←</button>
+            <span class="chat-ticker">SPY Analysis</span>
+        </div>
+        
+        <div class="chat-messages">
+            <div class="msg">
+                <div class="msg-time">AI • 10:45 AM</div>
+                <div class="ai-msg">
+                    SPY showing strong bullish signals. I can fetch real-time OI data or analyze specific strikes. What would you like to know?
+                </div>
+            </div>
+            
+            <div class="msg">
+                <div class="msg-time">You • 10:46 AM</div>
+                <div class="user-msg">
+                    Get current OI flow
+                </div>
+            </div>
+            
+            <div class="msg">
+                <div class="msg-time">AI • 10:46 AM</div>
+                <div class="ai-msg">
+                    Fetching live data...<br><br>
+                    <strong>SPY OI Update:</strong><br>
+                    • 450C: +8,000 OI (bullish)<br>
+                    • P/C Ratio: 0.62 ↓<br>
+                    • Smart money: +$1.2M calls<br>
+                    • Entry: 447.80<br>
+                    • Target: 450.00<br>
+                    <div class="tool-indicator">✅ OI Data (0.9s)</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-input-area">
+            <div class="input-group">
+                <input type="text" class="mobile-input" placeholder="Ask anything...">
+                <button class="send-button">→</button>
+            </div>
+            <div class="quick-actions">
+                <div class="quick-action">45 DTE analysis</div>
+                <div class="quick-action">Gamma levels</div>
+                <div class="quick-action">Risk check</div>
+                <div class="quick-action">Compare tickers</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bottom-nav">
+        <div class="nav-item active">
+            <div class="nav-icon">📊</div>
+            <div>Dashboard</div>
+        </div>
+        <div class="nav-item">
+            <div class="nav-icon">🔍</div>
+            <div>Search</div>
+        </div>
+        <div class="nav-item">
+            <div class="nav-icon">💬</div>
+            <div>Chat</div>
+        </div>
+        <div class="nav-item">
+            <div class="nav-icon">⚙️</div>
+            <div>Settings</div>
+        </div>
+    </div>
+</body>
+</html>
